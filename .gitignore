@@ -1,0 +1,58 @@
+# --- Abhängigkeiten & Build ---
+node_modules/
+dist/
+.vite/
+
+# Rust / WASM (wasm-pack)
+wasm-stl/target/
+wasm-stl/pkg/
+
+# --- Umgebung & Logs ---
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Betriebssystem ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Editor / IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Grok / Cursor (lokale Session-Daten)
+.grok/
+.cursor/
+
+# --- Große CAD-/Projektdateien (lokal, nicht versionieren) ---
+*.stl
+*.stpr
+*.step
+*.stp
+*.obj
+*.3mf
+
+# --- Test & Coverage ---
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# --- Sonstiges ---
+*.local

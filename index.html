@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CAD Tracer — Manuelle 3D Negativform</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="fusion-chrome">
+        <div class="fusion-top">
+          <div class="brand">
+            <span class="brand-mark" aria-hidden="true">◇</span>
+            <span class="brand-text">CAD Tracer <span>manuell · WASM</span></span>
+          </div>
+          <nav class="fusion-tabs" aria-label="Arbeitsbereiche">
+            <button type="button" data-fusion-tab="start" class="active">Start</button>
+            <button type="button" data-fusion-tab="body">Körper</button>
+            <button type="button" data-fusion-tab="align">Ausrichten</button>
+            <button type="button" data-fusion-tab="sketch">Skizze</button>
+            <button type="button" data-fusion-tab="draw">Zeichnen</button>
+            <button type="button" data-fusion-tab="view">Ansicht</button>
+            <button type="button" data-fusion-tab="contours">Konturen</button>
+          </nav>
+          <div class="fusion-quick" aria-label="Schnellzugriff">
+            <button type="button" id="undo-point" class="quick-btn" title="Rückgängig (Strg+Z)">
+              <span class="quick-btn-icon">↩</span>
+            </button>
+            <button type="button" id="save-project" class="quick-btn quick-btn-accent" title="Projekt speichern (.stpr)">
+              <span class="quick-btn-icon">💾</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="fusion-ribbon">
+          <div class="ribbon-workspace" data-ribbon="start">
+            <div class="ribbon-group">
+              <span class="ribbon-label">Geometrie</span>
+              <label class="ribbon-btn ribbon-btn-stack file-btn">
+                <span class="ribbon-btn-icon">📂</span>
+                <span class="ribbon-btn-label">STL laden</span>
+                <input id="scan-file" type="file" accept=".stl" hidden />
+              </label>
+            </div>
+            <div class="ribbon-group">
+              <span class="ribbon-label">Projekt</span>
+              <button type="button" id="load-project-start" class="ribbon-btn ribbon-btn-stack" title="CAD-Tracer-Projekt (.stpr)">
+                <span class="ribbon-btn-icon">📁</span>
+                <span class="ribbon-btn-label">Öffnen</span>
+              </button>
+              <input id="project-file" type="file" accept=".stpr" hidden />
+            </div>
+          </div>
+
+          <div class="ribbon-workspace hidden" data-ribbon="body">
+            <div class="ribbon-group">
+              <span class="ribbon-label">Verschieben</span>
+              <button type="button" data-tool="move-body" class="ribbon-btn ribbon-btn-stack" title="Bewegen (M) · Gizmo G">
+                <span class="ribbon-btn-icon">✥</span>
+                <span class="ribbon-btn-label">Bewegen <kbd>M</kbd></span>
+              </button>
+              <button type="button" data-tool="scale-body" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">⤢</span>
+                <span class="ribbon-btn-label">Skalieren</span>
+              </button>
+              <button type="button" id="body-transform-reset" class="ribbon-btn ribbon-btn-stack" title="Lage zurücksetzen">
+                <span class="ribbon-btn-icon">⊙</span>
+                <span class="ribbon-btn-label">Reset</span>
+              </button>
+            </div>
+            <div class="ribbon-group">
+              <span class="ribbon-label">Form</span>
+              <button type="button" data-tool="press-pull" class="ribbon-btn ribbon-btn-stack" title="Press Pull (P)">
+                <span class="ribbon-btn-icon">⇥</span>
+                <span class="ribbon-btn-label">Press Pull <kbd>P</kbd></span>
+              </button>
+              <button type="button" data-tool="smooth-body" class="ribbon-btn ribbon-btn-stack" title="Pinsel über Zacken/Kanten fahren">
+                <span class="ribbon-btn-icon">◎</span>
+                <span class="ribbon-btn-label">Glätten</span>
+              </button>
+              <button type="button" data-tool="smooth-section" class="ribbon-btn ribbon-btn-stack" title="Nur eine Sektion (z. B. 5 mm Band) glätten">
+                <span class="ribbon-btn-icon">▥</span>
+                <span class="ribbon-btn-label">Sektion</span>
+              </button>
+              <button type="button" id="body-cut-plane" class="ribbon-btn ribbon-btn-stack" title="Mit Arbeitsebene schneiden">
+                <span class="ribbon-btn-icon">▭</span>
+                <span class="ribbon-btn-label">Schnitt</span>
+              </button>
+            </div>
+            <div class="ribbon-group">
+              <span class="ribbon-label">Körper</span>
+              <button type="button" id="body-duplicate" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">⧉</span>
+                <span class="ribbon-btn-label">Duplizieren</span>
+              </button>
+              <button type="button" id="body-mirror-x" class="ribbon-btn ribbon-btn-stack" title="Spiegeln X">
+                <span class="ribbon-btn-icon">⇋</span>
+                <span class="ribbon-btn-label">Spiegeln</span>
+              </button>
+              <button type="button" id="body-delete" class="ribbon-btn ribbon-btn-stack ribbon-danger">
+                <span class="ribbon-btn-icon">×</span>
+                <span class="ribbon-btn-label">Löschen</span>
+              </button>
+            </div>
+            <div class="ribbon-group">
+              <span class="ribbon-label">Mesh</span>
+              <button type="button" id="reload-scan" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">↻</span>
+                <span class="ribbon-btn-label">Neu laden</span>
+              </button>
+              <button type="button" id="export-stl" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">⬇</span>
+                <span class="ribbon-btn-label">STL Export</span>
+              </button>
+            </div>
+            <div class="ribbon-group ribbon-group-hint">
+              <span class="ribbon-label">Glätten</span>
+              <label class="ribbon-mini-row">
+                <span>Pinsel <span id="body-brush-val">8%</span></span>
+                <input type="range" id="body-brush" min="3" max="25" value="8" class="ribbon-brush-slider" />
+              </label>
+              <label class="ribbon-mini-row">
+                <span>Stärke <span id="smooth-strength-val">45%</span></span>
+                <input type="range" id="smooth-strength" min="10" max="90" value="45" class="ribbon-brush-slider" />
+              </label>
+              <label class="ribbon-mini-row">
+                <span>Sektion <span id="smooth-section-depth-val">5</span> mm</span>
+                <input type="range" id="smooth-section-depth" min="1" max="30" value="5" class="ribbon-brush-slider" />
+              </label>
+              <label class="ribbon-mini-check">
+                <input type="checkbox" id="smooth-edge-only" checked />
+                <span>Nur Kanten &amp; Übergänge (Zacken)</span>
+              </label>
+              <p class="ribbon-hint">Glätten/Sektion: <strong>halten &amp; fahren</strong> · Sektion: 1× klicken (Band) → pinseln · <kbd>Shift</kbd>+Klick = neues Band</p>
+            </div>
+          </div>
+
+          <div class="ribbon-workspace hidden" data-ribbon="align">
+            <div class="ribbon-group">
+              <span class="ribbon-label">Navigation</span>
+              <button type="button" data-tool="navigate" class="ribbon-btn ribbon-btn-stack active">
+                <span class="ribbon-btn-icon">↔</span>
+                <span class="ribbon-btn-label">Navigieren</span>
+              </button>
+            </div>
+            <div class="ribbon-group">
+              <span class="ribbon-label">Ausrichten</span>
+              <button type="button" data-tool="align" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">⟳</span>
+                <span class="ribbon-btn-label">Gizmo</span>
+              </button>
+              <button type="button" id="plane-align-open" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">▣</span>
+                <span class="ribbon-btn-label">Ebene</span>
+              </button>
+              <button type="button" id="align-fit-view" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">◎</span>
+                <span class="ribbon-btn-label">Kamera</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="ribbon-workspace hidden" data-ribbon="sketch">
+            <div class="ribbon-group">
+              <span class="ribbon-label">Ebene</span>
+              <button type="button" data-tool="sketch-pick" class="ribbon-btn ribbon-btn-stack ribbon-primary" title="Neue Skizze (S) — XY / XZ / YZ anklicken">
+                <span class="ribbon-btn-icon">▣</span>
+                <span class="ribbon-btn-label">Neue Skizze <kbd>S</kbd></span>
+              </button>
+              <button type="button" data-sketch-axis="xy" class="ribbon-btn ribbon-btn-stack" title="Skizze auf XY">
+                <span class="ribbon-btn-icon" style="color:#ffd966">XY</span>
+                <span class="ribbon-btn-label">XY</span>
+              </button>
+              <button type="button" data-sketch-axis="xz" class="ribbon-btn ribbon-btn-stack" title="Skizze auf XZ">
+                <span class="ribbon-btn-icon" style="color:#6ee7b7">XZ</span>
+                <span class="ribbon-btn-label">XZ</span>
+              </button>
+              <button type="button" data-sketch-axis="yz" class="ribbon-btn ribbon-btn-stack" title="Skizze auf YZ">
+                <span class="ribbon-btn-icon" style="color:#f9a8d4">YZ</span>
+                <span class="ribbon-btn-label">YZ</span>
+              </button>
+            </div>
+            <div class="ribbon-group">
+              <span class="ribbon-label">Zeichnen</span>
+              <button type="button" data-tool="sketch-line" class="ribbon-btn ribbon-btn-stack ribbon-primary" title="Linie (L)">
+                <span class="ribbon-btn-icon">╱</span>
+                <span class="ribbon-btn-label">Linie <kbd>L</kbd></span>
+              </button>
+              <button type="button" data-tool="sketch-circle" class="ribbon-btn ribbon-btn-stack" title="Kreis (C)">
+                <span class="ribbon-btn-icon">○</span>
+                <span class="ribbon-btn-label">Kreis <kbd>C</kbd></span>
+              </button>
+              <button type="button" data-tool="sketch-arc" class="ribbon-btn ribbon-btn-stack" title="Bogen (A)">
+                <span class="ribbon-btn-icon">◠</span>
+                <span class="ribbon-btn-label">Bogen <kbd>A</kbd></span>
+              </button>
+              <button type="button" data-tool="sketch-rect" class="ribbon-btn ribbon-btn-stack" title="Rechteck (R)">
+                <span class="ribbon-btn-icon">▭</span>
+                <span class="ribbon-btn-label">Rechteck <kbd>R</kbd></span>
+              </button>
+              <button type="button" data-tool="sketch-triangle" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">△</span>
+                <span class="ribbon-btn-label">Dreieck</span>
+              </button>
+              <button type="button" data-tool="freehand" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">✎</span>
+                <span class="ribbon-btn-label">Freihand</span>
+              </button>
+              <button type="button" data-tool="edit" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">✥</span>
+                <span class="ribbon-btn-label">Bearbeiten</span>
+              </button>
+              <button type="button" data-tool="sketch-dim" class="ribbon-btn ribbon-btn-stack" title="Bemaßung (D)">
+                <span class="ribbon-btn-icon">↔</span>
+                <span class="ribbon-btn-label">Bemaßung <kbd>D</kbd></span>
+              </button>
+            </div>
+            <div class="ribbon-group">
+              <span class="ribbon-label">Skizze</span>
+              <button type="button" id="finish-sketch" class="ribbon-btn ribbon-btn-stack ribbon-primary" title="Skizze fertig (Enter)">
+                <span class="ribbon-btn-icon">✓</span>
+                <span class="ribbon-btn-label">Fertig <kbd>↵</kbd></span>
+              </button>
+              <button type="button" id="finish-contour-sketch" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">＋</span>
+                <span class="ribbon-btn-label">Profil speichern</span>
+              </button>
+            </div>
+            <div class="ribbon-group ribbon-group-hint">
+              <span class="ribbon-label">Hinweis</span>
+              <p class="ribbon-hint">Raster + Mittelpunkt auf der Skizze · Linie/Kreis ziehen · Bogen/Dreieck = 3 Klicks · <strong>Skizze fertig</strong></p>
+            </div>
+          </div>
+
+          <div class="ribbon-workspace hidden" data-ribbon="draw">
+            <div class="ribbon-group">
+              <span class="ribbon-label">Werkzeug</span>
+              <button type="button" data-tool="navigate" class="ribbon-btn ribbon-btn-stack active">
+                <span class="ribbon-btn-icon">↔</span>
+                <span class="ribbon-btn-label">Nav</span>
+              </button>
+              <button type="button" data-tool="polyline" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">⌖</span>
+                <span class="ribbon-btn-label">Linie</span>
+              </button>
+              <button type="button" data-tool="freehand" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">✎</span>
+                <span class="ribbon-btn-label">Freihand</span>
+              </button>
+              <button type="button" data-tool="lasso" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">◠</span>
+                <span class="ribbon-btn-label">Lasso</span>
+              </button>
+              <button type="button" data-tool="edit" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">✥</span>
+                <span class="ribbon-btn-label">Bearbeiten</span>
+              </button>
+            </div>
+            <div class="ribbon-group">
+              <span class="ribbon-label">Entwurf</span>
+              <button type="button" id="finish-contour" class="ribbon-btn ribbon-btn-stack ribbon-primary">
+                <span class="ribbon-btn-icon">✓</span>
+                <span class="ribbon-btn-label">Fertig</span>
+              </button>
+              <button type="button" id="close-contour" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">○</span>
+                <span class="ribbon-btn-label">Schließen</span>
+              </button>
+              <button type="button" id="discard-draft" class="ribbon-btn ribbon-btn-stack" title="Versehentlichen Entwurf löschen">
+                <span class="ribbon-btn-icon">×</span>
+                <span class="ribbon-btn-label">Entwurf weg</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="ribbon-workspace hidden" data-ribbon="view">
+            <div class="ribbon-group">
+              <span class="ribbon-label">Kamera</span>
+              <button type="button" data-view="perspective" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">3D</span>
+                <span class="ribbon-btn-label">Perspektive</span>
+              </button>
+              <button type="button" data-view="top" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">⤒</span>
+                <span class="ribbon-btn-label">Drauf</span>
+              </button>
+              <button type="button" data-view="front" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">▯</span>
+                <span class="ribbon-btn-label">Vorne</span>
+              </button>
+              <button type="button" data-view="side" class="ribbon-btn ribbon-btn-stack">
+                <span class="ribbon-btn-icon">▮</span>
+                <span class="ribbon-btn-label">Seite</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="ribbon-workspace hidden" data-ribbon="contours">
+            <div class="ribbon-group">
+              <span class="ribbon-label">Form</span>
+              <button type="button" id="loft-form" class="ribbon-btn ribbon-btn-stack ribbon-primary">
+                <span class="ribbon-btn-icon">⬡</span>
+                <span class="ribbon-btn-label">Negativform</span>
+              </button>
+            </div>
+            <div class="ribbon-group">
+              <span class="ribbon-label">Verwalten</span>
+              <button type="button" id="clear-contours" class="ribbon-btn ribbon-btn-stack ribbon-danger">
+                <span class="ribbon-btn-icon">⌫</span>
+                <span class="ribbon-btn-label">Alle löschen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="workspace-main">
+        <aside id="browser-panel" class="browser-panel" aria-label="Browser">
+          <header class="browser-header">
+            <span class="browser-title">Browser</span>
+          </header>
+          <div id="browser-tree" class="browser-tree"></div>
+          <nav id="browser-context-menu" class="browser-context-menu hidden" aria-label="Browser-Kontextmenü">
+            <div class="browser-ctx-title" id="browser-ctx-title">Eintrag</div>
+            <div id="browser-ctx-actions"></div>
+          </nav>
+        </aside>
+
+        <div class="viewport-wrap">
+        <main id="viewport" class="tool-navigate">
+          <div id="tool-hint" class="tool-hint">Links drehen · Mitte schieben · Rechtsklick = Kontextmenü</div>
+          <div id="transform-toolbar" class="transform-toolbar hidden">
+            <button type="button" data-tmode="translate" class="active" title="Verschieben (G)">↔ Verschieben</button>
+            <button type="button" data-tmode="rotate" title="Drehen (R)">⟳ Drehen</button>
+            <button type="button" id="tmode-world" title="Welt-/Lokalraum">Welt</button>
+          </div>
+
+          <aside id="panel-start" class="floating-panel hidden" aria-label="Start">
+            <header class="fp-header" data-drag-handle>
+              <span class="fp-title">Start</span>
+              <button type="button" class="fp-close" aria-label="Schließen">×</button>
+            </header>
+            <div class="fp-body">
+              <p class="fp-lead">Reiter = Werkzeugkästen. Ribbon ändert sich je Tab. Speichern &amp; Rückgängig rechts oben.</p>
+              <ul class="fp-list">
+                <li><strong>Start</strong> — STL &amp; Projekt laden</li>
+                <li><strong>Körper</strong> — Darstellung, Schnitt, Export</li>
+                <li><strong>Ausrichten</strong> — Gizmo &amp; Ebene</li>
+                <li><strong>Zeichnen</strong> — Kontur-Werkzeuge &amp; Entwurf</li>
+                <li><strong>Konturen</strong> — Negativform &amp; Verwaltung</li>
+                <li><strong>Projekt</strong> — <code>.stpr</code> mit Körper, Konturen &amp; Ausrichtung</li>
+              </ul>
+              <p class="fp-hint"><kbd>S</kbd> Skizze · <kbd>N</kbd> Navigieren · <kbd>F</kbd> Fit · Alle Kürzel unter Reiter <strong>Ansicht</strong></p>
+              <p class="fp-hint"><kbd>Esc</kbd> Abbruch / Panels schließen · Rechtsklick im 3D = Schnellmenü</p>
+            </div>
+          </aside>
+
+          <aside id="panel-body" class="floating-panel hidden" aria-label="Körper">
+            <header class="fp-header" data-drag-handle>
+              <span class="fp-title">Körper</span>
+              <button type="button" class="fp-close" aria-label="Schließen">×</button>
+            </header>
+            <div class="fp-body">
+              <label class="fp-row">Darstellung
+                <select id="scan-mode">
+                  <option value="cad" selected>CAD hell (Kanten)</option>
+                  <option value="flaeche">Fläche + Kanten</option>
+                  <option value="kontrast">Farbkontrast (Normalen)</option>
+                  <option value="punkte">Geschlossene Flächen</option>
+                  <option value="dunkel">Dunkel</option>
+                </select>
+              </label>
+              <label class="fp-row">Helligkeit <input id="scan-brightness" type="range" min="50" max="200" value="130" /></label>
+              <label class="fp-row">Deckkraft <input id="scan-opacity" type="range" min="0" max="100" value="72" /></label>
+              <label class="fp-check"><input id="scan-wire" type="checkbox" checked /> Kanten</label>
+              <label class="fp-check"><input id="scan-points" type="checkbox" /> Punkt-Sprites (nur andere Modi)</label>
+              <p class="fp-hint"><strong>Fläche + Kanten</strong> — halbtransparente Fläche mit scharfen Kanten</p>
+              <label class="fp-row">Anzeige jedes <input id="scan-stride" type="number" min="1" max="500" value="80" step="1" /> . Dreieck</label>
+              <button type="button" id="reload-scan-panel" class="fp-secondary">Geometrie neu laden</button>
+              <label class="fp-row">Schnittebene
+                <select id="slice-axis">
+                  <option value="none">aus</option>
+                  <option value="x">X</option>
+                  <option value="y">Y</option>
+                  <option value="z">Z</option>
+                </select>
+              </label>
+              <label class="fp-row">Schnittpos <input id="slice-pos" type="range" min="-500" max="500" value="0" step="0.5" /></label>
+            </div>
+          </aside>
+
+          <aside id="panel-align" class="floating-panel hidden" aria-label="Ausrichten">
+            <header class="fp-header" data-drag-handle>
+              <span class="fp-title">Ausrichten</span>
+              <button type="button" class="fp-close" aria-label="Schließen">×</button>
+            </header>
+            <div class="fp-body">
+              <p class="fp-lead">Ebene positionieren → Körper passt sich automatisch an (meiste Treffer).</p>
+
+              <div class="fp-section-title">Körper (manuell)</div>
+              <div class="align-steppers">
+                <div class="align-stepper-group">
+                  <span class="align-stepper-label">Verschieben · mm</span>
+                  <div class="align-stepper-row" data-align-field="posX">
+                    <span class="align-axis">X</span>
+                    <button type="button" class="align-nudge" data-delta="-1" title="−1 mm">−</button>
+                    <input id="align-posX" type="number" step="0.5" value="0" />
+                    <button type="button" class="align-nudge" data-delta="1" title="+1 mm">+</button>
+                  </div>
+                  <div class="align-stepper-row" data-align-field="posY">
+                    <span class="align-axis">Y</span>
+                    <button type="button" class="align-nudge" data-delta="-1">−</button>
+                    <input id="align-posY" type="number" step="0.5" value="0" />
+                    <button type="button" class="align-nudge" data-delta="1">+</button>
+                  </div>
+                  <div class="align-stepper-row" data-align-field="posZ">
+                    <span class="align-axis">Z</span>
+                    <button type="button" class="align-nudge" data-delta="-1">−</button>
+                    <input id="align-posZ" type="number" step="0.5" value="0" />
+                    <button type="button" class="align-nudge" data-delta="1">+</button>
+                  </div>
+                </div>
+                <div class="align-stepper-group">
+                  <span class="align-stepper-label">Drehen · °</span>
+                  <div class="align-stepper-row" data-align-field="rotX">
+                    <span class="align-axis">X</span>
+                    <button type="button" class="align-nudge" data-delta="-1" title="−1°">−</button>
+                    <input id="align-rotX" type="number" step="0.5" value="0" />
+                    <button type="button" class="align-nudge" data-delta="1">+</button>
+                  </div>
+                  <div class="align-stepper-row" data-align-field="rotY">
+                    <span class="align-axis">Y</span>
+                    <button type="button" class="align-nudge" data-delta="-1">−</button>
+                    <input id="align-rotY" type="number" step="0.5" value="0" />
+                    <button type="button" class="align-nudge" data-delta="1">+</button>
+                  </div>
+                  <div class="align-stepper-row" data-align-field="rotZ">
+                    <span class="align-axis">Z</span>
+                    <button type="button" class="align-nudge" data-delta="-1">−</button>
+                    <input id="align-rotZ" type="number" step="0.5" value="0" />
+                    <button type="button" class="align-nudge" data-delta="1">+</button>
+                  </div>
+                </div>
+              </div>
+              <p class="fp-hint">± je Klick: 1 mm bzw. 1° · Wert direkt eintippen möglich</p>
+
+              <div class="fp-section-title">Arbeitsebene</div>
+              <label class="fp-row">Ebene
+                <select id="plane-axis">
+                  <option value="xy">XY (Z fix)</option>
+                  <option value="xz">XZ (Y fix)</option>
+                  <option value="yz">YZ (X fix)</option>
+                </select>
+              </label>
+              <label class="fp-row">Position <input id="plane-pos" type="range" min="-500" max="500" value="0" step="0.5" /></label>
+              <div class="fp-value-row">
+                <span id="plane-pos-val">0</span>
+                <span id="plane-hit-count" class="plane-hit-count"></span>
+              </div>
+              <label class="fp-row">Toleranz
+                <input id="hit-tolerance" type="range" min="0.5" max="25" value="3" step="0.5" />
+                <span id="hit-tolerance-val">3</span> mm
+              </label>
+              <label class="fp-check"><input id="hit-plane" type="checkbox" checked /> Treffer anzeigen</label>
+              <div class="fp-actions">
+                <button type="button" id="plane-drag-toggle">⇅ Ebene ziehen</button>
+                <button type="button" id="align-to-plane" class="fp-primary">⊙ Auto-Ausrichten</button>
+              </div>
+              <button type="button" id="align-reset" class="fp-secondary">Körper zurücksetzen</button>
+              <p class="fp-hint"><strong>Auto-Ausrichten</strong> dreht XYZ (ca. 15°/Klick) und verschiebt den Körper, bis möglichst viele Punkte die Ebene treffen — mehrfach klicken, Trefferzahl beobachten.</p>
+              <p class="fp-hint">Gizmo: Ribbon <strong>Gizmo</strong> · <kbd>G</kbd> / <kbd>R</kbd> im Viewer</p>
+            </div>
+          </aside>
+
+          <aside id="panel-sketch" class="floating-panel hidden" aria-label="Skizze">
+            <header class="fp-header" data-drag-handle>
+              <span class="fp-title">Skizze</span>
+              <button type="button" class="fp-close" aria-label="Schließen">×</button>
+            </header>
+            <div class="fp-body">
+              <p class="fp-lead">Wie Fusion 360: Leeres Projekt zeigt Ursprung mit <strong>XY</strong>, <strong>XZ</strong>, <strong>YZ</strong> — Ebene anklicken zum Skizzieren.</p>
+              <ul class="fp-list">
+                <li><strong>Linie / Kreis / Rechteck</strong> — anklicken &amp; ziehen</li>
+                <li><strong>Bogen / Dreieck</strong> — 3 Punkte setzen</li>
+                <li><strong>Freihand</strong> — gedrückt halten &amp; ziehen</li>
+                <li><strong>Bearbeiten</strong> — gespeicherte Profile anpassen</li>
+                <li><strong>Bemaßung</strong> — 2 Punkte + Lage der Maßlinie (Strecke) oder Mittelpunkt + Rand (Kreis)</li>
+              </ul>
+              <label class="fp-row">Bemaßungsart
+                <select id="sketch-dim-kind">
+                  <option value="linear">Strecke</option>
+                  <option value="radius">Radius</option>
+                  <option value="diameter">Durchmesser</option>
+                </select>
+              </label>
+              <label class="fp-row">Einheit
+                <select id="sketch-unit">
+                  <option value="mm" selected>mm</option>
+                  <option value="cm">cm</option>
+                  <option value="m">m</option>
+                  <option value="in">in (Zoll)</option>
+                </select>
+              </label>
+              <label class="fp-row">Raster (mm) <input id="sketch-grid-spacing" type="range" min="1" max="50" value="10" /></label>
+              <ul id="sketch-dim-list" class="fp-dim-list"></ul>
+              <p class="fp-hint" id="sketch-grid-spacing-val">10 mm · Einrasten aktiv</p>
+              <label class="fp-check"><input id="sketch-grid-snap" type="checkbox" checked /> Am Raster einrasten</label>
+            </div>
+          </aside>
+
+          <aside id="panel-draw" class="floating-panel hidden" aria-label="Zeichnen">
+            <header class="fp-header" data-drag-handle>
+              <span class="fp-title">Zeichnen</span>
+              <button type="button" class="fp-close" aria-label="Schließen">×</button>
+            </header>
+            <div class="fp-body">
+              <p class="fp-lead">Werkzeuge auch im Ribbon. Kontur mit <strong>Fertig</strong> speichern.</p>
+              <label class="fp-check"><input id="hit-points" type="checkbox" checked /> Zeichenpunkte: gelb = trifft Körper</label>
+              <p class="fp-hint hit-legend"><span class="dot hit"></span> trifft &nbsp; <span class="dot miss"></span> verfehlt</p>
+              <p class="fp-hint">Startpunkt = <span style="color:#ff44ff">magenta</span> · Schließen = <span style="color:#00e676">grün</span> und wird <strong>automatisch gespeichert</strong></p>
+              <p class="fp-hint">Linie = klicken · Freihand/Lasso = ziehen · <strong>Bearbeiten</strong> = Kontur/Punkte anpassen · <kbd>Strg</kbd>+<kbd>Z</kbd></p>
+              <p class="fp-hint">Bearbeiten: Punkt ziehen · Linie klicken = neuer Punkt · Rechtsklick auf Punkt = Ecke / Glatt / Kurve</p>
+            </div>
+          </aside>
+
+          <aside id="panel-view" class="floating-panel hidden" aria-label="Ansicht">
+            <header class="fp-header" data-drag-handle>
+              <span class="fp-title">Ansicht</span>
+              <button type="button" class="fp-close" aria-label="Schließen">×</button>
+            </header>
+            <div class="fp-body">
+              <div class="view-buttons">
+                <button type="button" data-view="perspective">3D Perspektive</button>
+                <button type="button" data-view="top">Drauf (XY)</button>
+                <button type="button" data-view="front">Vorne (XZ)</button>
+                <button type="button" data-view="side">Seite (YZ)</button>
+              </div>
+              <label class="fp-row">Raster <input id="grid-size" type="range" min="1" max="50" value="10" /></label>
+              <p class="fp-hint">ViewCube: <strong>O</strong> Oben · <strong>V</strong> Vorne · <strong>R</strong> Rechts · Tasten <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> · Fit <kbd>F</kbd></p>
+              <table class="shortcut-table" aria-label="Fusion-Tastenkürzel">
+                <thead><tr><th>Taste</th><th>Aktion</th><th>Kontext</th></tr></thead>
+                <tbody id="fusion-shortcuts-list"></tbody>
+              </table>
+            </div>
+          </aside>
+
+          <aside id="panel-contours" class="floating-panel hidden" aria-label="Konturen">
+            <header class="fp-header" data-drag-handle>
+              <span class="fp-title">Konturen <span id="contour-count">0</span></span>
+              <button type="button" class="fp-close" aria-label="Schließen">×</button>
+            </header>
+            <div class="fp-body fp-body-scroll">
+              <ul id="contour-list" class="contour-list-panel"></ul>
+              <p class="fp-hint">Browser: <strong>⚓</strong> heftet Kontur am Körper · Drehen nur mit <strong>⟳ Gizmo</strong> (Ribbon) oder Ausrichten-Panel — <em>nicht</em> mit Navigieren (das dreht nur die Kamera)</p>
+              <button type="button" id="clear-contours-panel" class="fp-secondary ribbon-danger">Alle Konturen löschen</button>
+            </div>
+          </aside>
+
+          <nav id="body-color-menu" class="viewport-menu body-color-menu hidden" aria-label="Festkörper-Farbe">
+            <div class="vm-section">Festkörper einfärben</div>
+            <div class="body-color-swatches">
+              <button type="button" class="body-color-swatch" data-body-color="#e8ecf4" title="Silber" style="background:#e8ecf4"></button>
+              <button type="button" class="body-color-swatch" data-body-color="#ffffff" title="Weiß" style="background:#ffffff"></button>
+              <button type="button" class="body-color-swatch" data-body-color="#ff5a36" title="Orange" style="background:#ff5a36"></button>
+              <button type="button" class="body-color-swatch" data-body-color="#2563eb" title="Blau" style="background:#2563eb"></button>
+              <button type="button" class="body-color-swatch" data-body-color="#16a34a" title="Grün" style="background:#16a34a"></button>
+              <button type="button" class="body-color-swatch" data-body-color="#db2777" title="Magenta" style="background:#db2777"></button>
+              <button type="button" class="body-color-swatch" data-body-color="#eab308" title="Gelb" style="background:#eab308"></button>
+              <button type="button" class="body-color-swatch" data-body-color="#4b5563" title="Anthrazit" style="background:#4b5563"></button>
+            </div>
+            <label class="body-color-picker-row">
+              <span>Eigene Farbe</span>
+              <input id="body-color-input" type="color" value="#e8ecf4" />
+            </label>
+          </nav>
+
+          <nav id="point-menu" class="viewport-menu point-menu hidden" aria-label="Punktmenü">
+            <div class="vm-section">Punkt</div>
+            <button type="button" data-point-action="corner">◻ Ecke (gerade)</button>
+            <button type="button" data-point-action="smooth">◯ Glatt (Kurve)</button>
+            <button type="button" data-point-action="curve">◇ Kurve (ziehen)</button>
+            <div class="vm-section">Kontur</div>
+            <button type="button" data-point-action="insert">＋ Punkt hier einfügen</button>
+            <button type="button" data-point-action="delete">× Punkt löschen</button>
+            <button type="button" data-point-action="toggle-closed">↻ Schließen / Öffnen</button>
+          </nav>
+
+          <nav id="viewport-menu" class="viewport-menu hidden" aria-label="Kontextmenü">
+            <div class="vm-section">Werkzeug</div>
+            <button type="button" data-menu-tool="navigate">↔ Navigieren</button>
+            <button type="button" data-menu-tool="align">⟳ Ausrichten</button>
+            <button type="button" data-menu-tool="polyline">⌖ Linie zeichnen</button>
+            <button type="button" data-menu-tool="freehand">✎ Freihand</button>
+            <button type="button" data-menu-tool="lasso">◠ Lasso</button>
+            <button type="button" data-menu-tool="edit">✥ Kontur bearbeiten</button>
+            <div class="vm-section">Ausrichten</div>
+            <button type="button" data-menu-action="panel-align">▣ Ebene ausrichten…</button>
+            <button type="button" data-menu-tmode="translate">↔ Verschieben (G)</button>
+            <button type="button" data-menu-tmode="rotate">⟳ Drehen (R)</button>
+            <button type="button" data-menu-action="world">Welt / Lokal (W)</button>
+            <button type="button" data-menu-action="align-reset">Ausrichtung zurücksetzen</button>
+            <div class="vm-section">Ansicht</div>
+            <button type="button" data-menu-view="perspective">3D Perspektive</button>
+            <button type="button" data-menu-view="top">Drauf (XY)</button>
+            <button type="button" data-menu-view="front">Vorne (XZ)</button>
+            <button type="button" data-menu-view="side">Seite (YZ)</button>
+          </nav>
+        </main>
+        <div id="view-cube-host" class="view-cube-host" aria-label="ViewCube"></div>
+        </div>
+      </div>
+
+      <footer id="status">Geometrie laden oder vorhandenes Projekt öffnen</footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

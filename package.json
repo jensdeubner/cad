@@ -1,0 +1,20 @@
+{
+  "name": "scan-tracer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:wasm && vite build",
+    "build:wasm": "cd wasm-stl && wasm-pack build --target web --release",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.175.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.184.1",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0"
+  }
+}
