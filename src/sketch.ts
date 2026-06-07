@@ -224,9 +224,35 @@ export function makeSketchOriginMarker(
       opacity: 0.85,
     }),
   );
+  dot.name = 'sketch-origin-dot';
+  dot.userData.sketchOriginPick = true;
   dot.position.copy(frame.origin);
   dot.renderOrder = 5;
   group.add(dot);
 
+  group.userData.baseDotScale = dot.scale.x;
+  group.userData.baseDotOpacity = (dot.material as THREE.MeshBasicMaterial).opacity;
+
   return group;
+}
+
+const SKETCH_ORIGIN_HIGHLIGHT = 0xffeb3b;
+
+/** Fusion-style feedback when cursor snaps to sketch center. */
+export function setSketchOriginMarkerHighlighted(group: THREE.Object3D | null, on: boolean) {
+  if (!group || group.name !== 'sketch-origin') return;
+  const dot = group.getObjectByName('sketch-origin-dot') as THREE.Mesh | undefined;
+  if (!dot) return;
+  const mat = dot.material as THREE.MeshBasicMaterial;
+  const baseScale = (group.userData.baseDotScale as number) ?? 1;
+  const baseOpacity = (group.userData.baseDotOpacity as number) ?? 0.85;
+  mat.color.setHex(on ? SKETCH_ORIGIN_HIGHLIGHT : SKETCH_ORIGIN_COLOR);
+  mat.opacity = on ? 1 : baseOpacity;
+  dot.scale.setScalar(on ? baseScale * 1.45 : baseScale);
+  for (const child of group.children) {
+    if (!(child instanceof THREE.Line || child instanceof THREE.LineSegments)) continue;
+    const lineMat = child.material as THREE.LineBasicMaterial;
+    lineMat.color.setHex(on ? SKETCH_ORIGIN_HIGHLIGHT : SKETCH_ORIGIN_COLOR);
+    lineMat.opacity = on ? 1 : child.name === 'sketch-origin' ? 0.9 : 1;
+  }
 }

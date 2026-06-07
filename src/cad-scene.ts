@@ -1,3 +1,7 @@
+/**
+ * Fusion-style scene hierarchy: root → components → bodies (mesh groups).
+ * Active component/body selection and per-body transforms live here.
+ */
 import * as THREE from 'three';
 import {
   DEFAULT_ALIGNMENT,

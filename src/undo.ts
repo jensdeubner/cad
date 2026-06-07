@@ -17,6 +17,23 @@ export interface AppSnapshot {
   activeSketchId: string | null;
 }
 
+export interface TimelineStep {
+  label: string;
+}
+
+export interface TimelineView {
+  steps: TimelineStep[];
+  /** 0 = Start, n = nach n Schritten */
+  position: number;
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
+interface HistoryEntry {
+  label: string;
+  snapshot: AppSnapshot;
+}
+
 export function cloneContour(c: Contour): Contour {
   return {
     id: c.id,
@@ -65,9 +82,12 @@ export function captureSnapshot(
   };
 }
 
+/** Snapshot-basierte Undo/Redo-Historie mit Fusion-ähnlicher Schrittliste. */
 export class UndoHistory {
-  private stack: AppSnapshot[] = [];
-  private redoStack: AppSnapshot[] = [];
+  private undoStack: HistoryEntry[] = [];
+  private redoStack: HistoryEntry[] = [];
+  private labels: string[] = [];
+  private position = 0;
   private readonly max: number;
 
   constructor(max = 80) {
@@ -75,33 +95,57 @@ export class UndoHistory {
   }
 
   clear() {
-    this.stack = [];
+    this.undoStack = [];
     this.redoStack = [];
+    this.labels = [];
+    this.position = 0;
   }
 
-  push(snapshot: AppSnapshot) {
-    this.stack.push(snapshot);
-    if (this.stack.length > this.max) this.stack.shift();
+  push(snapshot: AppSnapshot, label = 'Änderung') {
+    this.undoStack.push({ snapshot, label });
+    this.labels = this.labels.slice(0, this.position);
+    this.labels.push(label);
+    this.position = this.labels.length;
     this.redoStack = [];
+    while (this.undoStack.length > this.max) {
+      this.undoStack.shift();
+      if (this.labels.length > 0) this.labels.shift();
+      this.position = Math.max(0, this.position - 1);
+    }
   }
 
   canUndo() {
-    return this.stack.length > 0;
+    return this.undoStack.length > 0;
   }
 
   canRedo() {
     return this.redoStack.length > 0;
   }
 
-  popUndo(): AppSnapshot | null {
-    return this.stack.pop() ?? null;
+  /** Ein Schritt zurück; gibt den wiederherzustellenden Snapshot zurück. */
+  takeUndo(current: AppSnapshot): AppSnapshot | null {
+    if (!this.canUndo()) return null;
+    const entry = this.undoStack.pop()!;
+    this.position = Math.max(0, this.position - 1);
+    this.redoStack.push({ snapshot: current, label: entry.label });
+    return entry.snapshot;
   }
 
-  pushRedo(snapshot: AppSnapshot) {
-    this.redoStack.push(snapshot);
+  /** Ein Schritt vor; gibt den wiederherzustellenden Snapshot zurück. */
+  takeRedo(current: AppSnapshot): AppSnapshot | null {
+    if (!this.canRedo()) return null;
+    const entry = this.redoStack.pop()!;
+    this.position = Math.min(this.labels.length, this.position + 1);
+    this.undoStack.push({ snapshot: current, label: entry.label });
+    return entry.snapshot;
   }
 
-  popRedo(): AppSnapshot | null {
-    return this.redoStack.pop() ?? null;
+  getTimeline(): TimelineView {
+    return {
+      steps: this.labels.map((label) => ({ label })),
+      position: this.position,
+      canUndo: this.canUndo(),
+      canRedo: this.canRedo(),
+    };
   }
 }

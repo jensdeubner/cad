@@ -46,7 +46,16 @@ export class AppMenu {
     document.querySelectorAll('[data-fusion-tab]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const tab = (btn as HTMLElement).dataset.fusionTab as FusionTab;
-        this.selectTab(tab, true);
+        // Nur Ribbon wechseln — Panel erst bei expliziter Funktion (data-open-panel).
+        this.selectTab(tab, false);
+      });
+    });
+
+    document.querySelectorAll('[data-open-panel]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const tab = (btn as HTMLElement).dataset.openPanel as FusionTab;
+        if (!tab || !TAB_PANEL[tab]) return;
+        this.openTab(tab);
       });
     });
   }

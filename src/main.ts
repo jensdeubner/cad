@@ -1,3 +1,10 @@
+/**
+ * CAD Tracer entry point — wires Three.js scene, DOM events, and domain modules.
+ *
+ * Orchestration lives here; prefer adding logic under `app/`, `sketch-mode/`,
+ * `tools/`, `input/`, or future `contours/`, `scene/`, `project/` packages.
+ * See `src/ARCHITECTURE.md` for the full module map.
+ */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
@@ -37,11 +44,37 @@ import {
   refineAlignmentPosition,
 } from './scan-plane-align';
 import { AppMenu } from './app-menu';
+import type { FusionShortcutAction } from './fusion-shortcuts';
 import {
-  FUSION_SHORTCUTS,
-  resolveFusionShortcut,
-  type FusionShortcutAction,
-} from './fusion-shortcuts';
+  ALIGN_POS_STEP,
+  ALIGN_ROT_STEP,
+  CONTOUR_COLORS,
+  SCAN_MODE_LABELS,
+  SOLID_BODY_COLOR,
+  TOOL_HINTS,
+  CLOSED_LINE_COLOR,
+  HIT_LINE_COLOR,
+  HIT_POINT_COLOR,
+  MISS_POINT_COLOR,
+  START_POINT_COLOR,
+  START_SNAP_COLOR,
+} from './app/constants';
+import { queryDomRefs } from './app/dom';
+import { initStatusElement, setStatus, uid } from './app/util';
+import type { MeshEditDrag, SmoothPaintSession, SketchInteraction } from './app/types';
+import {
+  bodyGizmoTool,
+  isSketchDrawTool,
+  isSketchPrimitiveTool,
+  meshSculptTool,
+
+  smoothToolActive,
+  toolRequiresActiveSketch,
+} from './tools/helpers';
+import { applyViewportNavigation, SKETCH_VIEWPORT_NAV_HINT } from './input/viewport-navigation';
+import { syncToolButtonHighlight, updateSketchRibbonState } from './sketch-mode/ribbon-state';
+import { createSketchDimensionApi, type SketchDimensionApi } from './sketch-mode/dimensions';
+import { bindFusionKeyboard, renderFusionShortcutsPanel } from './input/fusion-keyboard';
 import { collectScanPointsOnPlane, planeIntersectsScan, pointHitsScan } from './scan-hit';
 import {
   DEFAULT_ALIGNMENT,
@@ -55,8 +88,6 @@ import {
 
 type AlignField = keyof BodyTransform;
 
-const ALIGN_POS_STEP = 1;
-const ALIGN_ROT_STEP = 1;
 import {
   CadScene,
   DEFAULT_BODY_ID,
@@ -91,6 +122,8 @@ import {
   linePoints,
   rectanglePoints,
   snapSketchPoint,
+  snapSketchPointWithMeta,
+  sketchPlaneOrigin,
   trianglePoints,
 } from './sketch-geometry';
 import {
@@ -98,6 +131,7 @@ import {
   ORIGIN_PLANE_COLORS,
   makeOriginPlaneGroup,
   makeSketchGrid,
+  setSketchOriginMarkerHighlighted,
   makeSketchOriginMarker,
   originPlaneAxisFromObject,
   originPlaneSize,
@@ -106,16 +140,8 @@ import {
   viewPresetForSketchAxis,
   type Sketch,
 } from './sketch';
-import {
-  buildSketchDimensionGroup,
-  disposeSketchDimensionGroup,
-  formatSketchLength,
-  offsetFromPick,
-  sketchLengthMm,
-  type SketchDimension,
-  type SketchDimensionKind,
-  type SketchUnit,
-} from './sketch-dimension';
+import type { SketchDimension, SketchDimensionKind, SketchUnit } from './sketch-dimension';
+import { bindHistoryTimeline } from './history-timeline';
 import { UndoHistory, captureSnapshot } from './undo';
 import {
   bakeMeshGroupTransform,
@@ -146,18 +172,14 @@ import {
   type ScanDisplayMode,
 } from './scan-visual';
 
-const COLORS = ['#ffb347', '#4da3ff', '#7dffb3', '#ff6b9d', '#c9a0ff', '#fff07d'];
-const HIT_POINT_COLOR = '#ffff00';
-const MISS_POINT_COLOR = '#4a5568';
-const HIT_LINE_COLOR = '#ff00cc';
 const HIT_MARKER_COLOR = 0xffee00;
-const START_POINT_COLOR = '#ff44ff';
-const START_SNAP_COLOR = '#00ff88';
-const CLOSED_LINE_COLOR = '#00e676';
 
 let closeSnapPreview = false;
 
-const viewport = document.getElementById('viewport')!;
+const dom = queryDomRefs();
+initStatusElement(dom.status);
+
+const viewport = dom.viewport;
 const appMenu = new AppMenu(viewport, {
   align: {
     onOpen: () => {
@@ -174,42 +196,17 @@ const appMenu = new AppMenu(viewport, {
     },
   },
 });
-const toolHint = document.getElementById('tool-hint')!;
-const statusEl = document.getElementById('status')!;
-const viewportMenu = document.getElementById('viewport-menu')!;
-const pointMenu = document.getElementById('point-menu')!;
-const bodyColorMenu = document.getElementById('body-color-menu')!;
-const bodyColorInput = document.getElementById('body-color-input') as HTMLInputElement;
-const browserPanelEl = document.getElementById('browser-panel')!;
-const browserContextMenu = document.getElementById('browser-context-menu')!;
-const browserCtxTitle = document.getElementById('browser-ctx-title')!;
-const browserCtxActions = document.getElementById('browser-ctx-actions')!;
-
-const TOOL_HINTS: Record<Tool, string> = {
-  navigate: 'Navigieren: Links drehen · Mausrad zoomen · Mitte schieben · Rechtsklick = Menü',
-  align: 'Ausrichten: Gizmo an Komponente — Achsen greifen · G = Verschieben · R = Drehen',
-  'move-body':
-    'Bewegen: Körper anklicken · Gizmo ziehen · G = Verschieben · R = Drehen · W = Welt/Lokal',
-  'scale-body': 'Skalieren: Körper anklicken · Gizmo-Griffe ziehen · S = Skalieren · Enter = in Mesh einbacken',
-  'press-pull': 'Press Pull: Fläche anklicken & ziehen — rausziehen oder reindrücken',
-  'smooth-body': 'Glätten: gedrückt halten & über Zacken/Kanten fahren — Übergänge weicher machen',
-  'smooth-section':
-    'Sektion: 1× auf Übergang klicken (Band setzen), dann gedrückt halten & pinseln — z. B. 5 mm zwischen Kurven',
-  'sketch-pick': 'Skizze: XY / XZ / YZ Ursprungsebene im 3D-Fenster anklicken — dann zeichnen',
-  'sketch-line': 'Linie: Startpunkt setzen & ziehen — am Raster einrasten',
-  'sketch-circle': 'Kreis: Mittelpunkt setzen & Radius ziehen',
-  'sketch-arc': 'Bogen: 3 Punkte — Start, Verlauf, Ende',
-  'sketch-rect': 'Rechteck: Ecke setzen & diagonal ziehen',
-  'sketch-triangle': 'Dreieck: 3 Ecken anklicken',
-  'sketch-dim':
-    'Bemaßung: Strecke = 2 Punkte + Maßlinie setzen · Radius/Durchmesser = Mittelpunkt + Kreisrand',
-  polyline: 'Linie: Im 3D-Fenster klicken = Punkt setzen · „Profil speichern“',
-  freehand: 'Freihand: Maus gedrückt halten und ziehen · loslassen = fertig',
-  lasso: 'Lasso: Maus gedrückt halten, Umriss ziehen, loslassen',
-  edit: 'Bearbeiten: Kontur wählen · Punkt ziehen (in ihrer Ebene) · Rechtsklick → Kurve · blaue Griffe auch aus der Ebene = 3D-Bogen',
-};
-const contourList = document.getElementById('contour-list')!;
-const contourCount = document.getElementById('contour-count')!;
+const toolHint = dom.toolHint;
+const viewportMenu = dom.viewportMenu;
+const pointMenu = dom.pointMenu;
+const bodyColorMenu = dom.bodyColorMenu;
+const bodyColorInput = dom.bodyColorInput;
+const browserPanelEl = dom.browserPanel;
+const browserContextMenu = dom.browserContextMenu;
+const browserCtxTitle = dom.browserCtxTitle;
+const browserCtxActions = dom.browserCtxActions;
+const contourList = dom.contourList;
+const contourCount = dom.contourCount;
 const browserState = {
   componentsFolderExpanded: true,
   originPlanesVisible: true,
@@ -229,8 +226,6 @@ const bodySolidColors = new Map<string, number>();
 const solidBodyGeom = new Map<string, THREE.BufferGeometry>();
 const pickRaycaster = new THREE.Raycaster();
 const pickPointer = new THREE.Vector2();
-
-const SOLID_BODY_COLOR = 0xe8ecf4;
 
 let bodyColorMenuTarget: string | null = null;
 
@@ -265,11 +260,11 @@ const browserPanel = new BrowserPanel(document.getElementById('browser-tree')!, 
   onClearForm: () => clearForm(),
   onBuildForm: () => void buildLoft(),
 });
-const planeAxisSel = document.getElementById('plane-axis') as HTMLSelectElement;
-const planePos = document.getElementById('plane-pos') as HTMLInputElement;
-const planePosVal = document.getElementById('plane-pos-val')!;
-const scanFile = document.getElementById('scan-file') as HTMLInputElement;
-const projectFile = document.getElementById('project-file') as HTMLInputElement;
+const planeAxisSel = dom.planeAxisSel;
+const planePos = dom.planePos;
+const planePosVal = dom.planePosVal;
+const scanFile = dom.scanFile;
+const projectFile = dom.projectFile;
 
 let tool: Tool = 'navigate';
 let planeAxis: PlaneAxis = 'xy';
@@ -280,16 +275,17 @@ let activeSketchId: string | null = null;
 let activeDraft: Contour | null = null;
 let sketchGridSpacing = 10;
 let sketchGridSnap = true;
+let sketchOriginSnapActive = false;
+let shiftKeyHeld = false;
+let sketchDimCapturePointerId: number | null = null;
 let sketchPreviewLine: Line2 | null = null;
-let sketchInteraction:
-  | { mode: 'drag'; tool: 'sketch-line' | 'sketch-circle' | 'sketch-rect'; start: THREE.Vector3 }
-  | { mode: 'clicks'; tool: 'sketch-arc' | 'sketch-triangle'; points: THREE.Vector3[] }
-  | null = null;
+let sketchInteraction: SketchInteraction | null = null;
 let hoveredOriginPlane: PlaneAxis | null = null;
 let sketchDimensions: SketchDimension[] = [];
 let sketchUnit: SketchUnit = 'mm';
 let sketchDimKind: SketchDimensionKind = 'linear';
-let dimPick: { step: 1 | 2; a: THREE.Vector3; b?: THREE.Vector3 } | null = null;
+/** Sketch dimension controller — initialized after scene + pickSketchHit exist. */
+let sketchDims!: SketchDimensionApi;
 
 function sketchUI(id: string) {
   if (!sketchBrowserUI.has(id)) sketchBrowserUI.set(id, { expanded: true });
@@ -310,28 +306,22 @@ let draggingPlane = false;
 let planeDragStartPos = 0;
 const planeDragStartHit = new THREE.Vector3();
 const undoHistory = new UndoHistory();
+const historyTimeline = bindHistoryTimeline(document.getElementById('fusion-timeline')!, {
+  onUndo: () => performUndo(),
+  onRedo: () => performRedo(),
+  onJumpTo: (position) => jumpToHistory(position),
+  getView: () => undoHistory.getTimeline(),
+});
+
+function refreshHistoryTimeline() {
+  historyTimeline.refresh();
+}
 let transformUndoPushed = false;
 let strokeUndoPushed = false;
 let bodyBrushPct = 8;
 let smoothStrengthPct = 45;
 let smoothSectionDepthMm = 5;
 let smoothEdgeOnly = true;
-
-type MeshEditDrag = {
-  tool: 'press-pull';
-  bodyId: string;
-  center: THREE.Vector3;
-  normal: THREE.Vector3;
-  startClientY: number;
-  basePositions: Float32Array;
-};
-
-type SmoothPaintSession = {
-  bodyId: string;
-  undoPushed: boolean;
-  sectionOrigin?: THREE.Vector3;
-  sectionNormal?: THREE.Vector3;
-};
 
 let meshEditDrag: MeshEditDrag | null = null;
 let smoothPaint: SmoothPaintSession | null = null;
@@ -361,14 +351,9 @@ viewport.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.mouseButtons = {
-  LEFT: THREE.MOUSE.ROTATE,
-  MIDDLE: THREE.MOUSE.PAN,
-  RIGHT: null as unknown as THREE.MOUSE,
-};
 
 const clock = new THREE.Clock();
-const viewCubeHost = document.getElementById('view-cube-host')!;
+const viewCubeHost = dom.viewCubeHost;
 const viewCube = new ViewCube(
   camera,
   renderer,
@@ -381,7 +366,10 @@ const viewCube = new ViewCube(
   },
   {
     getPivot: () => controls.target,
-    onOrbitChange: () => updateHitFeedback(),
+    onOrbitChange: () => {
+      updateHitFeedback();
+      sketchDims?.updateScreenScales();
+    },
   },
 );
 
@@ -407,22 +395,6 @@ function ab() {
   return cadScene.getActiveBody();
 }
 
-function bodyGizmoTool(): boolean {
-  return tool === 'move-body' || tool === 'scale-body';
-}
-
-function smoothToolActive(): boolean {
-  return tool === 'smooth-body' || tool === 'smooth-section';
-}
-
-function meshSculptTool(): boolean {
-  return tool === 'press-pull' || smoothToolActive();
-}
-
-function orbitToolActive(): boolean {
-  return tool === 'navigate' || tool === 'align' || tool === 'sketch-pick' || bodyGizmoTool();
-}
-
 function getBodyBrushRadius(): number {
   return cadScene.size * (bodyBrushPct / 100);
 }
@@ -435,7 +407,7 @@ function captureBodyMeshBuffers(): Record<string, ArrayBuffer> {
   return map;
 }
 
-function pushMeshUndo() {
+function pushMeshUndo(label = 'Körper bearbeiten') {
   undoHistory.push(
     captureSnapshot(
       contours,
@@ -447,7 +419,9 @@ function pushMeshUndo() {
       activeSketchId,
       sketchDimensions,
     ),
+    label,
   );
+  refreshHistoryTimeline();
 }
 
 function captureBodyTransforms(): Record<string, BodyTransform> {
@@ -477,7 +451,7 @@ function selectBody(bodyId: string) {
   updateTransformGizmo();
   applyScanTheme(bodyDisplayMode, bodyBrightness);
   refreshBrowserPanel();
-  if (bodyGizmoTool()) {
+  if (bodyGizmoTool(tool)) {
     setStatus(`Körper „${body.label}“ — Gizmo zum ${tool === 'scale-body' ? 'Skalieren' : 'Verschieben/Drehen'}`);
   }
 }
@@ -758,7 +732,7 @@ function renameComponent(compId: string) {
 function resetComponentAlignment(compId: string) {
   const comp = cadScene.getComponent(compId);
   if (!comp) return;
-  pushUndo();
+  pushUndo('Komponente zurücksetzen');
   comp.alignment = { ...DEFAULT_ALIGNMENT };
   applyAlignment(comp.group, comp.alignment);
   if (compId === ac().id) onBodyTransformChanged();
@@ -992,19 +966,34 @@ scene.add(transformControls.getHelper());
 transformControls.addEventListener('dragging-changed', (event) => {
   if (event.value && !transformUndoPushed) {
     if (tool === 'scale-body') pushMeshUndo();
-    else pushUndo();
+    else pushUndo('Gizmo verschieben');
     transformUndoPushed = true;
   }
   if (!event.value) {
     transformUndoPushed = false;
     if (tool === 'scale-body') void bakeActiveBodyTransform(false);
   }
-  controls.enabled = !event.value && orbitToolActive();
+  if (!event.value) syncOrbitControls();
+  else controls.enabled = false;
 });
 
 transformControls.addEventListener('objectChange', () => {
   onBodyTransformChanged();
 });
+
+function syncOrbitControls() {
+  applyViewportNavigation(controls, {
+    tool,
+    activeSketchId,
+    shiftKeyHeld,
+    viewCubeAnimating: viewCube.animating,
+    viewCubeDragging: viewCube.dragging,
+    transformDragging: transformControls.dragging,
+    draggingPlane,
+  });
+}
+
+syncOrbitControls();
 
 const drawGroup = new THREE.Group();
 drawGroup.name = 'draw';
@@ -1036,6 +1025,11 @@ sketchDimGroup.name = 'sketch-dimensions';
 sketchDimGroup.visible = false;
 scene.add(sketchDimGroup);
 
+const sketchDimHoverGroup = new THREE.Group();
+sketchDimHoverGroup.name = 'sketch-dim-hover';
+sketchDimHoverGroup.visible = false;
+scene.add(sketchDimHoverGroup);
+
 let workPlaneMesh = makeWorkPlaneMesh('xy', 0, 200);
 scene.add(workPlaneMesh);
 
@@ -1050,20 +1044,14 @@ overlay.id = 'draw-overlay';
 viewport.appendChild(overlay);
 const octx = overlay.getContext('2d')!;
 
-function setStatus(msg: string) {
-  statusEl.textContent = msg;
-}
-
-function uid() {
-  return Math.random().toString(36).slice(2, 9);
-}
-
 function updateLineResolutions() {
-  drawGroup.traverse((obj) => {
-    if (obj instanceof Line2) {
-      (obj.material as LineMaterial).resolution.copy(lineResolution);
-    }
-  });
+  for (const root of [drawGroup, sketchDimGroup, sketchGridGroup]) {
+    root.traverse((obj) => {
+      if (obj instanceof Line2) {
+        (obj.material as LineMaterial).resolution.copy(lineResolution);
+      }
+    });
+  }
 }
 
 function resize() {
@@ -1101,9 +1089,9 @@ function refreshWorkPlaneMesh(hitVisual: PlaneHitVisual = 'neutral') {
     tool !== 'navigate' &&
     tool !== 'align' &&
     tool !== 'sketch-pick' &&
-    !bodyGizmoTool() &&
-    !meshSculptTool() &&
-    (isSketchDrawTool(tool) || tool === 'polyline' || tool === 'lasso');
+    !bodyGizmoTool(tool) &&
+    !meshSculptTool(tool) &&
+    (isSketchDrawTool(tool, activeSketchId) || tool === 'polyline' || tool === 'lasso');
   const visual = hitPlaneFeedback || planeDragMode ? hitVisual : 'neutral';
   workPlaneMesh = makeWorkPlaneMesh(planeAxis, planePosition, cadScene.size * 2.2, drawing || planeDragMode, visual);
   if (planeDragMode) {
@@ -1216,7 +1204,7 @@ function autoAlignScanToPlane() {
     setStatus('Kein Körper geladen');
     return;
   }
-  pushUndo();
+  pushUndo('Auto-Ausrichten');
   const tol = getEffectiveHitTolerance();
   const alignBtn = document.getElementById('align-to-plane') as HTMLButtonElement | null;
   alignBusy = true;
@@ -1448,13 +1436,14 @@ function beginSketchOnPlane(axis: PlaneAxis, position = 0) {
   updateOriginPlaneHighlight(axis);
   setView(viewPresetForSketchAxis(axis));
   updateSketchGrid();
-  setTool('sketch-line');
-  appMenu.selectTab('sketch');
+  setTool('navigate');
+  appMenu.selectTab('sketch', false);
   refreshWorkPlaneMesh(getPlaneHitVisual());
   updateHitFeedback();
-  refreshSketchDimList();
+  sketchDims.refreshList();
   refreshBrowserPanel();
-  setStatus(`Skizze auf ${axis.toUpperCase()} — Linie ziehen oder Werkzeug wählen`);
+  updateSketchRibbonState(activeSketchId, tool);
+  setStatus(`Skizze auf ${axis.toUpperCase()} — Zeichenwerkzeug wählen (z. B. Linie L)`);
 }
 
 function activateSketch(sketchId: string) {
@@ -1468,28 +1457,31 @@ function activateSketch(sketchId: string) {
   updateOriginPlaneHighlight(sk.axis);
   setView(viewPresetForSketchAxis(sk.axis));
   updateSketchGrid();
-  setTool('sketch-line');
-  appMenu.selectTab('sketch');
+  setTool('navigate');
+  appMenu.selectTab('sketch', false);
   refreshWorkPlaneMesh(getPlaneHitVisual());
   updateHitFeedback();
-  refreshSketchDimList();
+  sketchDims.refreshList();
   refreshBrowserPanel();
-  setStatus(`${sk.label} — Linie/Kreis ziehen · Bogen/Dreieck = 3 Klicks`);
+  updateSketchRibbonState(activeSketchId, tool);
+  setStatus(`${sk.label} — Zeichenwerkzeug wählen · Bogen/Dreieck = 3 Klicks`);
 }
 
 function finishSketch() {
   discardIncompleteDraft(true);
   clearSketchInteraction();
-  clearDimPick();
+  sketchDims.clearSession();
+  setSketchOriginSnapFeedback(false);
   activeSketchId = null;
   hoveredOriginPlane = null;
   if (isEmptyProject()) setupEmptyProjectView();
   updateOriginPlaneHighlight(null);
   updateSketchGrid();
-  rebuildSketchDimensions();
-  refreshSketchDimList();
+  sketchDims.rebuild();
+  sketchDims.refreshList();
   setTool('sketch-pick');
   refreshBrowserPanel();
+  updateSketchRibbonState(null, 'sketch-pick');
   setStatus('Skizze beendet — XY / XZ / YZ im 3D-Fenster anklicken');
 }
 
@@ -1498,20 +1490,6 @@ function enterSketchPickMode() {
   setTool('sketch-pick');
   if (isEmptyProject()) setupEmptyProjectView();
   setStatus('Neue Skizze — XY / XZ / YZ Ebene im 3D-Fenster anklicken');
-}
-
-function isSketchPrimitiveTool(t: Tool): boolean {
-  return (
-    t === 'sketch-line' ||
-    t === 'sketch-circle' ||
-    t === 'sketch-arc' ||
-    t === 'sketch-rect' ||
-    t === 'sketch-triangle'
-  );
-}
-
-function isSketchDrawTool(t: Tool): boolean {
-  return isSketchPrimitiveTool(t) || (t === 'freehand' && !!activeSketchId);
 }
 
 function disposeSketchGridContents() {
@@ -1536,225 +1514,24 @@ function disposeSketchGridContents() {
 }
 
 function updateSketchGrid() {
+  setSketchOriginSnapFeedback(false);
   disposeSketchGridContents();
   if (!activeSketchId) {
     sketchGridGroup.visible = false;
-    rebuildSketchDimensions();
+    sketchDims.rebuild();
     return;
   }
   const sk = sketches.find((s) => s.id === activeSketchId);
   if (!sk) {
     sketchGridGroup.visible = false;
-    rebuildSketchDimensions();
+    sketchDims.rebuild();
     return;
   }
   const extent = originPlaneSize(cadScene.size) * 0.5;
   sketchGridGroup.add(makeSketchGrid(sk.axis, sk.position, extent, sketchGridSpacing));
   sketchGridGroup.add(makeSketchOriginMarker(sk.axis, sk.position, sketchGridSpacing));
   sketchGridGroup.visible = true;
-  rebuildSketchDimensions();
-}
-
-function clearDimPick() {
-  dimPick = null;
-  rebuildSketchDimensions();
-}
-
-function pickSketchDimPoint(clientX: number, clientY: number): THREE.Vector3 | null {
-  const hit = pickSketchHit(clientX, clientY);
-  if (!hit || !activeSketchId) return hit;
-  const tol = Math.max(sketchGridSpacing * 0.4, 2.5);
-  let best: THREE.Vector3 | null = null;
-  let bestD = tol;
-  for (const c of contours.filter((x) => x.sketchId === activeSketchId && x.visible !== false)) {
-    for (const p of c.points) {
-      const d = hit.distanceTo(p);
-      if (d < bestD) {
-        bestD = d;
-        best = p;
-      }
-    }
-  }
-  return best ?? hit;
-}
-
-function commitSketchDimension(input: {
-  a: THREE.Vector3;
-  b: THREE.Vector3;
-  offset: number;
-  kind: SketchDimensionKind;
-}) {
-  if (!activeSketchId) return;
-  const dim: SketchDimension = {
-    id: uid(),
-    sketchId: activeSketchId,
-    kind: input.kind,
-    axis: planeAxis,
-    position: planePosition,
-    a: input.a.clone(),
-    b: input.b.clone(),
-    offset: input.offset,
-    visible: true,
-  };
-  sketchDimensions.push(dim);
-  rebuildSketchDimensions();
-  refreshSketchDimList();
-  const mm = sketchLengthMm(dim.a, dim.b);
-  setStatus(`Bemaßung: ${formatSketchLength(mm, sketchUnit, dim.kind)}`);
-}
-
-function deleteSketchDimension(id: string) {
-  if (!sketchDimensions.some((d) => d.id === id)) return;
-  pushUndo();
-  sketchDimensions = sketchDimensions.filter((d) => d.id !== id);
-  rebuildSketchDimensions();
-  refreshSketchDimList();
-}
-
-function rebuildSketchDimensions(preview?: SketchDimension | null) {
-  sketchDimGroup.children.slice().forEach((child) => {
-    disposeSketchDimensionGroup(child);
-    child.removeFromParent();
-  });
-  if (!activeSketchId) {
-    sketchDimGroup.visible = false;
-    return;
-  }
-  const labelScale = Math.max(cadScene.size * 0.012, 1.5);
-  const dims = sketchDimensions.filter(
-    (d) => d.sketchId === activeSketchId && d.visible !== false,
-  );
-  for (const d of dims) {
-    sketchDimGroup.add(buildSketchDimensionGroup(d, sketchUnit, labelScale));
-  }
-  if (preview) {
-    sketchDimGroup.add(buildSketchDimensionGroup(preview, sketchUnit, labelScale));
-  }
-  sketchDimGroup.visible = dims.length > 0 || !!preview;
-}
-
-function refreshSketchDimList() {
-  const list = document.getElementById('sketch-dim-list');
-  if (!list) return;
-  list.innerHTML = '';
-  if (!activeSketchId) return;
-  const dims = sketchDimensions.filter((d) => d.sketchId === activeSketchId);
-  dims.forEach((d, i) => {
-    const mm = sketchLengthMm(d.a, d.b);
-    const li = document.createElement('li');
-    const label = document.createElement('span');
-    label.textContent = `${i + 1}. ${formatSketchLength(mm, sketchUnit, d.kind)}`;
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.title = 'Bemaßung löschen';
-    del.textContent = '×';
-    del.onclick = () => deleteSketchDimension(d.id);
-    li.appendChild(label);
-    li.appendChild(del);
-    list.appendChild(li);
-  });
-}
-
-function handleSketchDimPointerDown(e: PointerEvent) {
-  if (!activeSketchId) {
-    setStatus('Zuerst eine Skizze auf XY / XZ / YZ starten');
-    return;
-  }
-  const hit = pickSketchDimPoint(e.clientX, e.clientY);
-  if (!hit) {
-    setStatus('Kein Punkt auf der Skizze — näher an Profil oder Raster klicken');
-    return;
-  }
-
-  if (!dimPick) {
-    dimPick = { step: 1, a: hit.clone() };
-    setStatus(
-      sketchDimKind === 'linear'
-        ? 'Bemaßung: 2. Punkt wählen'
-        : 'Bemaßung: Kreisrand / Radiuspunkt wählen',
-    );
-    return;
-  }
-
-  if (dimPick.step === 1) {
-    const b = hit.clone();
-    if (sketchDimKind !== 'linear') {
-      if (dimPick.a.distanceTo(b) < 0.5) {
-        setStatus('Radius zu klein — weiterer Randpunkt nötig');
-        return;
-      }
-      pushUndo();
-      commitSketchDimension({ a: dimPick.a, b, offset: 0, kind: sketchDimKind });
-      clearDimPick();
-      return;
-    }
-    if (dimPick.a.distanceTo(b) < 0.5) {
-      setStatus('Strecke zu kurz — weiter entfernten Punkt wählen');
-      return;
-    }
-    dimPick = { step: 2, a: dimPick.a, b };
-    setStatus('Bemaßung: Klick = Position der Maßlinie (Hilfslinien)');
-    return;
-  }
-
-  if (dimPick.step === 2 && dimPick.b) {
-    const offset = offsetFromPick(planeAxis, planePosition, dimPick.a, dimPick.b, hit);
-    pushUndo();
-    commitSketchDimension({
-      a: dimPick.a,
-      b: dimPick.b,
-      offset,
-      kind: sketchDimKind,
-    });
-    clearDimPick();
-  }
-}
-
-function handleSketchDimPointerMove(clientX: number, clientY: number) {
-  if (!dimPick || !activeSketchId) return;
-  const hit = pickSketchDimPoint(clientX, clientY);
-  if (!hit) return;
-  if (dimPick.step === 1 && sketchDimKind === 'linear') {
-    rebuildSketchDimensions({
-      id: 'preview',
-      sketchId: activeSketchId,
-      kind: sketchDimKind,
-      axis: planeAxis,
-      position: planePosition,
-      a: dimPick.a.clone(),
-      b: hit.clone(),
-      offset: sketchGridSpacing * 1.5,
-      visible: true,
-    });
-    return;
-  }
-  if (dimPick.step === 2 && dimPick.b) {
-    rebuildSketchDimensions({
-      id: 'preview',
-      sketchId: activeSketchId,
-      kind: sketchDimKind,
-      axis: planeAxis,
-      position: planePosition,
-      a: dimPick.a.clone(),
-      b: dimPick.b.clone(),
-      offset: offsetFromPick(planeAxis, planePosition, dimPick.a, dimPick.b, hit),
-      visible: true,
-    });
-  }
-}
-
-function dimensionsToProject() {
-  return sketchDimensions.map((d) => ({
-    id: d.id,
-    sketchId: d.sketchId,
-    kind: d.kind,
-    axis: d.axis,
-    position: d.position,
-    a: [d.a.x, d.a.y, d.a.z] as [number, number, number],
-    b: [d.b.x, d.b.y, d.b.z] as [number, number, number],
-    offset: d.offset,
-    visible: d.visible !== false,
-  }));
+  sketchDims.rebuild();
 }
 
 function clearSketchPreview() {
@@ -1778,7 +1555,56 @@ function showSketchPreview(points: THREE.Vector3[], closed: boolean, color = '#4
   sketchGridGroup.add(sketchPreviewLine);
 }
 
+function getSketchOriginMarker(): THREE.Object3D | null {
+  return sketchGridGroup.getObjectByName('sketch-origin') ?? null;
+}
+
+function setSketchOriginSnapFeedback(active: boolean) {
+  if (sketchOriginSnapActive === active) return;
+  sketchOriginSnapActive = active;
+  setSketchOriginMarkerHighlighted(getSketchOriginMarker(), active);
+}
+
+function pickSketchOriginMarker(clientX: number, clientY: number): THREE.Vector3 | null {
+  if (!activeSketchId || !sketchGridGroup.visible) return null;
+  const originGroup = getSketchOriginMarker();
+  if (!originGroup) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pickPointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  pickPointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  pickRaycaster.setFromCamera(pickPointer, camera);
+  const hits = pickRaycaster.intersectObjects(originGroup.children, true);
+  for (const h of hits) {
+    let o: THREE.Object3D | null = h.object;
+    while (o) {
+      if (o.userData.sketchOriginPick) {
+        setSketchOriginSnapFeedback(true);
+        return sketchPlaneOrigin(planeAxis, planePosition);
+      }
+      o = o.parent;
+    }
+  }
+  return null;
+}
+
+function applySketchSnap(
+  hit: THREE.Vector3,
+  axis: PlaneAxis = planeAxis,
+  position: number = planePosition,
+): THREE.Vector3 {
+  if (!sketchGridSnap || !activeSketchId) {
+    setSketchOriginSnapFeedback(false);
+    return hit;
+  }
+  const snapped = snapSketchPointWithMeta(hit, axis, position, sketchGridSpacing);
+  setSketchOriginSnapFeedback(snapped.snappedOrigin);
+  return snapped.point;
+}
+
 function pickSketchHit(clientX: number, clientY: number): THREE.Vector3 | null {
+  const originPick = pickSketchOriginMarker(clientX, clientY);
+  if (originPick) return originPick;
+
   const hit = pickOnPlane(
     clientX,
     clientY,
@@ -1789,16 +1615,68 @@ function pickSketchHit(clientX: number, clientY: number): THREE.Vector3 | null {
     planeAxis,
     planePosition,
   );
-  if (!hit) return null;
-  if (sketchGridSnap && activeSketchId) {
-    return snapSketchPoint(hit, planeAxis, planePosition, sketchGridSpacing);
+  if (!hit) {
+    setSketchOriginSnapFeedback(false);
+    return null;
   }
-  return hit;
+  return applySketchSnap(hit);
 }
+
+sketchDims = createSketchDimensionApi({
+  getActiveSketchId: () => activeSketchId,
+  getContours: () => contours,
+  getSketchDimensions: () => sketchDimensions,
+  setSketchDimensions: (dims) => {
+    sketchDimensions = dims;
+  },
+  getSketchUnit: () => sketchUnit,
+  getSketchDimKind: () => sketchDimKind,
+  getSketchGridSpacing: () => sketchGridSpacing,
+  getPlaneAxis: () => planeAxis,
+  getPlanePosition: () => planePosition,
+  getSceneSize: () => cadScene.size,
+  getSketchDimGroup: () => sketchDimGroup,
+  getSketchDimHoverGroup: () => sketchDimHoverGroup,
+  getLineResolution: () => lineResolution,
+  getRendererDom: () => renderer.domElement,
+  getCamera: () => camera,
+  pickSketchHit,
+  pushUndo: (label?: string) => pushUndo(label),
+  rebuildContourLines,
+  setDimPickCursor: (canPick) => {
+    viewport.classList.toggle('sketch-dim-can-pick', canPick && tool === 'sketch-dim');
+  },
+  openSketchPanel: () => appMenu.openTab('sketch'),
+  onWorkflowEnd: () => {
+    if (tool === 'sketch-dim') setTool('navigate');
+    syncOrbitControls();
+  },
+  releasePointerCapture: () => {
+    if (sketchDimCapturePointerId !== null) {
+      try {
+        if (renderer.domElement.hasPointerCapture(sketchDimCapturePointerId)) {
+          renderer.domElement.releasePointerCapture(sketchDimCapturePointerId);
+        }
+      } catch {
+        /* ignore */
+      }
+      sketchDimCapturePointerId = null;
+    }
+    syncOrbitControls();
+  },
+  sketchDimInputRow: dom.sketchDimInputRow,
+  sketchDimValueInput: dom.sketchDimValueInput,
+  sketchDimUnitLabel: dom.sketchDimUnitLabel,
+  sketchDimApplyBtn: dom.sketchDimApplyBtn,
+  sketchDimHud: dom.sketchDimHud,
+  sketchDimHudValue: dom.sketchDimHudValue,
+  sketchDimHudUnit: dom.sketchDimHudUnit,
+  sketchDimHudApply: dom.sketchDimHudApply,
+});
 
 function commitSketchPrimitive(points: THREE.Vector3[], closed: boolean, label: string) {
   if (points.length < 2) return;
-  pushUndo();
+  pushUndo(`Skizze: ${label}`);
   const contour: Contour = {
     id: uid(),
     componentId: ac().id,
@@ -1807,7 +1685,7 @@ function commitSketchPrimitive(points: THREE.Vector3[], closed: boolean, label: 
     position: planePosition,
     points: points.map((p) => p.clone()),
     closed,
-    color: COLORS[contours.length % COLORS.length],
+    color: CONTOUR_COLORS[contours.length % CONTOUR_COLORS.length],
     visible: true,
   };
   contours.push(contour);
@@ -1908,7 +1786,6 @@ function handleSketchPointerDown(e: PointerEvent) {
   }
   if (tool === 'sketch-line' || tool === 'sketch-circle' || tool === 'sketch-rect') {
     sketchInteraction = { mode: 'drag', tool, start: hit.clone() };
-    controls.enabled = false;
     renderer.domElement.setPointerCapture(e.pointerId);
     previewSketchPrimitive(tool, hit, hit);
   }
@@ -1931,7 +1808,7 @@ function handleSketchPointerUp(e: PointerEvent) {
   const end = hit ?? sketchInteraction.start;
   finishSketchDrag(sketchInteraction.tool, sketchInteraction.start, end);
   clearSketchInteraction();
-  controls.enabled = orbitToolActive();
+  syncOrbitControls();
   try {
     renderer.domElement.releasePointerCapture(e.pointerId);
   } catch {
@@ -1975,7 +1852,7 @@ function updateAlignmentReadout() {
 }
 
 function applyScanAlignment(recordUndo = false) {
-  if (recordUndo) pushUndo();
+  if (recordUndo) pushUndo('Ausrichtung ändern');
   applyAlignment(ac().group, ac().alignment);
   onBodyTransformChanged();
 }
@@ -2010,7 +1887,7 @@ function onBodyTransformChanged() {
   if (tool === 'align') {
     ac().alignment = readAlignmentFromObject(ac().group);
     updateAlignmentReadout();
-  } else if (bodyGizmoTool()) {
+  } else if (bodyGizmoTool(tool)) {
     cadScene.readBodyTransform(ab().id);
   }
   cadScene.updateWorldMatrix();
@@ -2063,7 +1940,7 @@ function toggleContourAttachById(id: BrowserItemId) {
   const cid = id.slice('contour:'.length);
   const c = contours.find((x) => x.id === cid);
   if (!c) return;
-  pushUndo();
+  pushUndo('Kontur an Körper anheften');
   const bodyId = c.attachedToBodyId ?? ab().id;
   ac().group.updateMatrixWorld(true);
   const attachMatrix = cadScene.getAttachWorldMatrix(bodyId);
@@ -2122,8 +1999,9 @@ function snapshotNow() {
   );
 }
 
-function pushUndo() {
-  undoHistory.push(snapshotNow());
+function pushUndo(label = 'Änderung') {
+  undoHistory.push(snapshotNow(), label);
+  refreshHistoryTimeline();
 }
 
 function getSelectedContour(): Contour | null {
@@ -2272,7 +2150,7 @@ function formTriangleCount(): number {
 
 function clearForm() {
   if (!formGroup.children.length) return;
-  pushUndo();
+  pushUndo('Negativform löschen');
   formGroup.clear();
   refreshBrowserPanel();
   setStatus('Negativform gelöscht');
@@ -2384,7 +2262,7 @@ function deleteBrowserItem(id: BrowserItemId) {
   if (id.startsWith('contour:')) {
     const cid = id.slice('contour:'.length);
     if (!contours.some((x) => x.id === cid)) return;
-    pushUndo();
+    pushUndo('Kontur löschen');
     if (selectedContourId === cid) selectContour(null);
     contours = contours.filter((x) => x.id !== cid);
     const obj = drawGroup.getObjectByName(cid);
@@ -2519,38 +2397,66 @@ function restoreSnapshot(snap: ReturnType<typeof snapshotNow>) {
   renderDraftLine();
   refreshContourList();
   updateSketchGrid();
-  rebuildSketchDimensions();
-  refreshSketchDimList();
+  sketchDims.rebuild();
+  sketchDims.refreshList();
+  updateSketchRibbonState(activeSketchId, tool);
+  syncToolButtons(tool);
   onBodyTransformChanged();
   updateTransformGizmo();
 }
 
 function performUndo() {
-  if (!undoHistory.canUndo()) {
+  const prev = undoHistory.takeUndo(snapshotNow());
+  if (!prev) {
     setStatus('Nichts zum Rückgängigmachen');
     return;
   }
-  undoHistory.pushRedo(snapshotNow());
-  const prev = undoHistory.popUndo();
-  if (!prev) return;
   restoreSnapshot(prev);
-  setStatus('Rückgängig (Strg+Z)');
+  refreshHistoryTimeline();
+  const view = undoHistory.getTimeline();
+  const label = view.position > 0 ? view.steps[view.position - 1]?.label : 'Start';
+  setStatus(`Rückgängig → ${label ?? 'Start'} (Strg+Z)`);
 }
 
 function performRedo() {
-  if (!undoHistory.canRedo()) {
+  const next = undoHistory.takeRedo(snapshotNow());
+  if (!next) {
     setStatus('Nichts zum Wiederholen');
     return;
   }
-  undoHistory.push(snapshotNow());
-  const next = undoHistory.popRedo();
-  if (!next) return;
   restoreSnapshot(next);
-  setStatus('Wiederholt (Strg+Umschalt+Z)');
+  refreshHistoryTimeline();
+  const view = undoHistory.getTimeline();
+  const label = view.steps[view.position - 1]?.label ?? 'Schritt';
+  setStatus(`Wiederholt → ${label} (Strg+Umschalt+Z)`);
+}
+
+function jumpToHistory(target: number) {
+  const view = undoHistory.getTimeline();
+  if (target < 0 || target > view.steps.length) return;
+  if (target === view.position) return;
+
+  while (undoHistory.getTimeline().position > target) {
+    const snap = undoHistory.takeUndo(snapshotNow());
+    if (!snap) break;
+    restoreSnapshot(snap);
+  }
+  while (undoHistory.getTimeline().position < target) {
+    const snap = undoHistory.takeRedo(snapshotNow());
+    if (!snap) break;
+    restoreSnapshot(snap);
+  }
+  refreshHistoryTimeline();
+  if (target === 0) {
+    setStatus('Verlauf: Ausgangszustand');
+  } else {
+    const step = undoHistory.getTimeline().steps[target - 1];
+    setStatus(`Verlauf: ${step?.label ?? `Schritt ${target}`}`);
+  }
 }
 
 function resetScanAlignment() {
-  pushUndo();
+  pushUndo('Scan-Ausrichtung zurücksetzen');
   ac().alignment = { ...DEFAULT_ALIGNMENT };
   applyAlignment(ac().group, ac().alignment);
   onBodyTransformChanged();
@@ -2561,7 +2467,7 @@ function updateTransformGizmo() {
   const gizmoTarget =
     tool === 'align' && ab().meshGroup.children.length > 0
       ? ac().group
-      : bodyGizmoTool() && ab().meshGroup.children.length > 0
+      : bodyGizmoTool(tool) && ab().meshGroup.children.length > 0
         ? ab().meshGroup
         : null;
   if (gizmoTarget) {
@@ -2569,16 +2475,17 @@ function updateTransformGizmo() {
     transformControls.setMode(tool === 'scale-body' ? 'scale' : 'translate');
     transformControls.setSize(Math.min(1.2, Math.max(0.45, cadScene.size * 0.008)));
     toolbar?.classList.remove('hidden');
-    controls.enabled = !transformControls.dragging;
+    if (transformControls.dragging) controls.enabled = false;
+    else syncOrbitControls();
   } else {
     transformControls.detach();
     toolbar?.classList.add('hidden');
-    controls.enabled = orbitToolActive();
+    syncOrbitControls();
   }
 }
 
 function resetBodyTransform() {
-  pushUndo();
+  pushUndo('Körper zurücksetzen');
   ab().transform = { ...DEFAULT_ALIGNMENT };
   applyAlignment(ab().meshGroup, ab().transform);
   onBodyTransformChanged();
@@ -3029,7 +2936,7 @@ async function saveProject() {
     hitTolerance: getHitTolerance(),
     contours: contoursToProject(),
     sketches: sketches.map((s) => ({ ...s })),
-    sketchDimensions: dimensionsToProject(),
+    sketchDimensions: sketchDims.dimensionsToProject(),
     sketchUnit,
     activeSketchId: activeSketchId ?? undefined,
   });
@@ -3072,7 +2979,7 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   sketches = [];
   sketchDimensions = [];
   activeSketchId = null;
-  clearDimPick();
+  sketchDims.clearSession();
   updateOriginPlaneHighlight(null);
   drawGroup.children.slice().forEach((child) => {
     if (child instanceof Line2 && child.name) disposeLine2(child);
@@ -3082,6 +2989,7 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   activeDraft = null;
   clearDraftVisuals();
   undoHistory.clear();
+  refreshHistoryTimeline();
 
   planeAxis = meta.planeAxis;
   planeAxisSel.value = meta.planeAxis;
@@ -3153,6 +3061,9 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
     b: new THREE.Vector3(d.b[0], d.b[1], d.b[2]),
     offset: d.offset,
     visible: d.visible !== false,
+    contourId: d.contourId,
+    pointIndex0: d.pointIndex0,
+    pointIndex1: d.pointIndex1,
   }));
 
   contours = meta.contours.map((c) => ({
@@ -3185,9 +3096,11 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   refreshWorkPlaneMesh(getPlaneHitVisual());
   updateHitFeedback();
   updateSketchGrid();
-  rebuildSketchDimensions();
-  refreshSketchDimList();
+  sketchDims.rebuild();
+  sketchDims.refreshList();
   refreshBrowserPanel();
+  updateSketchRibbonState(activeSketchId, tool);
+  syncToolButtons(tool);
 
   setStatus(
     `Projekt geladen — ${contours.length} Kontur(en), ${sketches.length} Skizze(n), ${sketchDimensions.length} Bemaßung(en)`,
@@ -3205,6 +3118,7 @@ async function loadStlBuffer(buf: ArrayBuffer, label: string, stride = ab().disp
   const mesh = parse_stl_with_stride(new Uint8Array(buf), stride);
   transformControls.detach();
   undoHistory.clear();
+  refreshHistoryTimeline();
   ab().meshGroup.clear();
   ac().alignment = { ...DEFAULT_ALIGNMENT };
   ab().transform = { ...DEFAULT_ALIGNMENT };
@@ -3284,7 +3198,7 @@ function getPointMarkerColors(points: THREE.Vector3[]): string[] {
       if (activeDraft?.closed || closeSnapPreview) return START_SNAP_COLOR;
       return START_POINT_COLOR;
     }
-    if (!hitPointFeedback) return activeDraft?.color ?? COLORS[0];
+    if (!hitPointFeedback) return activeDraft?.color ?? CONTOUR_COLORS[0];
     return hits[i] ? HIT_POINT_COLOR : MISS_POINT_COLOR;
   });
 }
@@ -3304,7 +3218,7 @@ function getPointMarkerSizes(points: THREE.Vector3[], base: number): number[] {
 
 function getDraftLineColor(points: THREE.Vector3[]): string {
   if (activeDraft?.closed) return CLOSED_LINE_COLOR;
-  if (!hitPointFeedback || !points.length) return activeDraft?.color ?? COLORS[0];
+  if (!hitPointFeedback || !points.length) return activeDraft?.color ?? CONTOUR_COLORS[0];
   const hits = getPointHitFlags(points);
   const hitCount = hits.filter(Boolean).length;
   if (hitCount === points.length) return HIT_LINE_COLOR;
@@ -3423,7 +3337,7 @@ function startDraft() {
       position: planePosition,
       points: [],
       closed: false,
-      color: COLORS[contours.length % COLORS.length],
+      color: CONTOUR_COLORS[contours.length % CONTOUR_COLORS.length],
       visible: true,
     };
   }
@@ -3527,7 +3441,7 @@ function saveActiveDraft(options: { forceClosed?: boolean; recordUndo?: boolean 
   }
 
   if (forceClosed) activeDraft.closed = true;
-  if (recordUndo) pushUndo();
+  if (recordUndo) pushUndo('Kontur speichern');
 
   const saved = activeDraft;
   if (activeSketchId && !saved.sketchId) saved.sketchId = activeSketchId;
@@ -3582,7 +3496,7 @@ function refreshContourList() {
     const del = document.createElement('button');
     del.textContent = '×';
     del.onclick = () => {
-      pushUndo();
+      pushUndo('Kontur löschen');
       contours = contours.filter((x) => x.id !== c.id);
       if (selectedContourId === c.id) selectContour(null);
       const obj = drawGroup.getObjectByName(c.id);
@@ -3621,7 +3535,7 @@ function addPointFromEvent(e: PointerEvent, recordUndo = true) {
     return;
   }
   if (isNearStartPoint(hit)) {
-    if (recordUndo) pushUndo();
+    if (recordUndo) pushUndo('Kontur schließen');
     activeDraft!.closed = true;
     closeSnapPreview = false;
     renderDraftLine();
@@ -3629,7 +3543,7 @@ function addPointFromEvent(e: PointerEvent, recordUndo = true) {
     return;
   }
 
-  if (recordUndo) pushUndo();
+  if (recordUndo) pushUndo('Punkt setzen');
   activeDraft!.points.push(hit);
   renderDraftLine();
   const geom = ab().geometry;
@@ -3676,7 +3590,7 @@ function finishLasso() {
     clearOverlay();
     return;
   }
-  if (!strokeUndoPushed) pushUndo();
+  if (!strokeUndoPushed) pushUndo('Freihand zeichnen');
   startDraft();
   const rect = renderer.domElement.getBoundingClientRect();
   for (const p of lassoScreen) {
@@ -3705,10 +3619,7 @@ function finishLasso() {
 }
 
 function syncToolButtons(active: Tool) {
-  document.querySelectorAll('[data-tool], [data-menu-tool]').forEach((b) => {
-    const t = (b as HTMLElement).dataset.tool ?? (b as HTMLElement).dataset.menuTool;
-    b.classList.toggle('active', t === active);
-  });
+  syncToolButtonHighlight(active, activeSketchId);
 }
 
 function hidePointMenu() {
@@ -3738,8 +3649,7 @@ function beginEditDrag(target: Extract<EditPick, { kind: 'anchor' | 'handle-in' 
     contourId: target.contourId,
     pointIndex: target.pointIndex,
   };
-  pushUndo();
-  controls.enabled = false;
+  pushUndo('Kontur bearbeiten');
 }
 
 function handleEditPointerDown(e: PointerEvent) {
@@ -3770,7 +3680,7 @@ function handleEditPointerDown(e: PointerEvent) {
   if (target?.kind === 'segment') {
     const c = contours.find((x) => x.id === target.contourId);
     if (!c) return;
-    pushUndo();
+    pushUndo('Punkt einfügen');
     const p = storagePointFromWorldHit(target.point, c, true);
     const idx = insertPoint(c, target.segmentIndex, p);
     selectContour(c.id, idx);
@@ -3806,7 +3716,7 @@ function handleEditPointerDown(e: PointerEvent) {
   }
   const ins = findInsertOnContour(contourInWorldSpace(c, contourWorldMatrix(c)), hit);
   if (!ins) return;
-  pushUndo();
+  pushUndo('Punkt einfügen');
   const p = worldToContourStorage(hit, c, contourWorldMatrix(c));
   const idx = insertPoint(c, ins.afterIndex, p);
   selectContour(c.id, idx);
@@ -3819,7 +3729,7 @@ function applyPointMenuAction(action: string) {
   const c = contours.find((x) => x.id === pointMenuTarget!.contourId);
   if (!c) return;
   const i = pointMenuTarget.pointIndex;
-  pushUndo();
+  pushUndo('Punkttyp ändern');
 
   if (action === 'corner' || action === 'smooth' || action === 'curve') {
     setPointType(c, i, action as ContourPointType);
@@ -3858,6 +3768,16 @@ function applyPointMenuAction(action: string) {
 }
 
 function setTool(next: Tool) {
+  if (next === tool) {
+    next = activeSketchId ? 'navigate' : 'sketch-pick';
+  }
+  if (!activeSketchId && toolRequiresActiveSketch(next)) {
+    setStatus('Zuerst Skizze starten — Ebene XY / XZ / YZ anklicken oder Neue Skizze');
+    tool = 'sketch-pick';
+    syncToolButtons('sketch-pick');
+    updateSketchRibbonState(null, 'sketch-pick');
+    return;
+  }
   if (planeDragMode && next !== 'navigate' && next !== 'align') setPlaneDragMode(false);
   if (next === 'navigate' || next === 'align') {
     discardIncompleteDraft(true);
@@ -3918,8 +3838,12 @@ function setTool(next: Tool) {
     );
     refreshWorkPlaneMesh(getPlaneHitVisual());
   }
-  toolHint.textContent = TOOL_HINTS[next];
-  controls.enabled = orbitToolActive();
+  const navHint =
+    activeSketchId || next === 'sketch-pick' || next.startsWith('sketch-')
+      ? ` · ${SKETCH_VIEWPORT_NAV_HINT}`
+      : '';
+  toolHint.textContent = (TOOL_HINTS[next] ?? next) + navHint;
+  syncOrbitControls();
   if (next === 'edit') {
     refreshWorkPlaneMesh(getPlaneHitVisual());
     renderEditVisuals();
@@ -3930,7 +3854,10 @@ function setTool(next: Tool) {
     clearSketchInteraction();
   }
   if (next !== 'sketch-dim') {
-    clearDimPick();
+    sketchDims.clearSession();
+    viewport.classList.remove('sketch-dim-can-pick');
+  } else if (next === 'sketch-dim') {
+    setStatus('Bemaßung: Kante anfahren (leuchtet auf) · klicken · Maßlinie ziehen · Wert eingeben · Doppelklick auf Maßzahl = bearbeiten');
   }
   if (next !== 'lasso') {
     lassoScreen = [];
@@ -3939,6 +3866,7 @@ function setTool(next: Tool) {
   closeSnapPreview = false;
   updateHitFeedback();
   updateTransformGizmo();
+  updateSketchRibbonState(activeSketchId, next);
   setStatus(`Werkzeug: ${next}`);
 }
 
@@ -4044,7 +3972,7 @@ async function buildLoft() {
     return;
   }
   formGroup.clear();
-  pushUndo();
+  pushUndo('Negativform erstellen');
   await promoteLoftToNewBody(mesh);
   setStatus(
     `Negativform als „${ab().label}“ — ${mesh.triangle_count.toLocaleString()} Dreiecke · Frei bewegen zum Positionieren`,
@@ -4085,15 +4013,59 @@ async function exportForm() {
   setStatus(`STL exportiert — ${base}.stl`);
 }
 
+function isSketchDimValueUiTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Node)) return false;
+  return (
+    dom.sketchDimHud.contains(target) ||
+    dom.sketchDimInputRow.contains(target) ||
+    dom.sketchDimValueInput === target ||
+    dom.sketchDimApplyBtn === target ||
+    dom.sketchDimHudValue === target ||
+    dom.sketchDimHudApply === target
+  );
+}
+
+/** Switch to navigate before OrbitControls sees the click (capture phase). */
+renderer.domElement.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (e.button !== 0 || !activeSketchId || tool !== 'sketch-dim') return;
+    if (sketchDims.awaitingValue || sketchDims.dimDragActive) return;
+
+    if (sketchDims.selectDimensionAt(e.clientX, e.clientY)) {
+      setTool('navigate');
+      syncOrbitControls();
+      sketchDims.selectDimensionAt(e.clientX, e.clientY);
+      return;
+    }
+    if (!sketchDims.hasPickableEdgeAt(e.clientX, e.clientY) && !sketchDims.hasSession) {
+      setTool('navigate');
+      syncOrbitControls();
+    }
+  },
+  { capture: true },
+);
+
 // Pointer handlers
 renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (
+    activeSketchId &&
+    sketchDims.awaitingValue &&
+    e.button === 0 &&
+    tool !== 'sketch-dim' &&
+    !isSketchDimValueUiTarget(e.target)
+  ) {
+    sketchDims.clearSession();
+    syncOrbitControls();
+    return;
+  }
   if (planeDragMode && e.button === 0) {
     const hit = intersectWorkPlane(e.clientX, e.clientY);
     if (hit) {
       draggingPlane = true;
       planeDragStartPos = planePosition;
       planeDragStartHit.copy(hit);
-      controls.enabled = false;
+      syncOrbitControls();
       renderer.domElement.setPointerCapture(e.pointerId);
       e.preventDefault();
       return;
@@ -4104,7 +4076,7 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
     handleEditPointerDown(e);
     return;
   }
-  if (bodyGizmoTool() && e.button === 0) {
+  if (bodyGizmoTool(tool) && e.button === 0) {
     const bodyId = pickBodyMeshAt(e.clientX, e.clientY);
     if (bodyId) selectBody(bodyId);
     return;
@@ -4128,18 +4100,18 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
         startClientY: e.clientY,
         basePositions: (posAttr.array as Float32Array).slice(),
       };
-      controls.enabled = false;
+      syncOrbitControls();
       renderer.domElement.setPointerCapture(e.pointerId);
       e.preventDefault();
     }
     return;
   }
-  if (smoothToolActive() && e.button === 0) {
+  if (smoothToolActive(tool) && e.button === 0) {
     const pick = pickBodySurfaceAt(e.clientX, e.clientY);
     if (pick) {
       selectBody(pick.bodyId);
       beginSmoothPaint(pick, e.shiftKey);
-      controls.enabled = false;
+      syncOrbitControls();
       renderer.domElement.setPointerCapture(e.pointerId);
       e.preventDefault();
     }
@@ -4150,20 +4122,42 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
     if (axis) {
       e.preventDefault();
       beginSketchOnPlane(axis, 0);
+      return;
+    }
+    if (activeSketchId && sketchDims.tryPreselectEdge(e.clientX, e.clientY)) {
+      e.preventDefault();
+      return;
     }
     return;
   }
-  if (tool === 'sketch-dim' && activeSketchId && e.button === 0) {
-    e.preventDefault();
-    handleSketchDimPointerDown(e);
+  if (
+    activeSketchId &&
+    e.button === 0 &&
+    tool === 'navigate' &&
+    sketchDims.tryPreselectEdge(e.clientX, e.clientY)
+  ) {
     return;
+  }
+  if (tool === 'sketch-dim' && activeSketchId && e.button === 0) {
+    if (
+      sketchDims.handlePointerDown(e, (id) => {
+        renderer.domElement.setPointerCapture(id);
+        sketchDimCapturePointerId = id;
+      })
+    ) {
+      e.preventDefault();
+    }
+    return;
+  }
+  if (activeSketchId && e.button === 0 && tool === 'navigate') {
+    sketchDims.selectDimensionAt(e.clientX, e.clientY);
   }
   if (isSketchPrimitiveTool(tool) && activeSketchId && e.button === 0) {
     e.preventDefault();
     handleSketchPointerDown(e);
     return;
   }
-  if (tool === 'navigate' || tool === 'align' || bodyGizmoTool() || tool === 'sketch-pick') return;
+  if (tool === 'navigate' || tool === 'align' || bodyGizmoTool(tool) || tool === 'sketch-pick') return;
   e.preventDefault();
   if (tool === 'polyline') {
     addPointFromEvent(e);
@@ -4172,19 +4166,26 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
     strokeUndoPushed = false;
     startDraft();
     renderer.domElement.setPointerCapture(e.pointerId);
-    pushUndo();
+    pushUndo('Freihand starten');
     strokeUndoPushed = true;
     addPointFromEvent(e, false);
   } else if (tool === 'lasso') {
     isDrawing = true;
     strokeUndoPushed = false;
-    pushUndo();
+    pushUndo('Lasso starten');
     strokeUndoPushed = true;
     lassoScreen = [];
     const rect = renderer.domElement.getBoundingClientRect();
     lassoScreen.push({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     renderer.domElement.setPointerCapture(e.pointerId);
     drawLassoOverlay();
+  }
+});
+
+renderer.domElement.addEventListener('dblclick', (e) => {
+  if (!activeSketchId || (tool !== 'sketch-dim' && tool !== 'navigate')) return;
+  if (sketchDims.handleDoubleClick(e.clientX, e.clientY)) {
+    e.preventDefault();
   }
 });
 
@@ -4233,7 +4234,11 @@ renderer.domElement.addEventListener('pointermove', (e) => {
         )
       : intersectWorkPlane(e.clientX, e.clientY);
     if (!hit) return;
-    const p = storagePointFromWorldHit(hit, c, true);
+    const snapped =
+      c.sketchId && sketchGridSnap
+        ? applySketchSnap(hit, c.axis, c.position)
+        : hit;
+    const p = storagePointFromWorldHit(snapped, c, true);
     if (editDrag.kind === 'anchor') {
       moveAnchor(c, editDrag.pointIndex, p);
     } else {
@@ -4258,8 +4263,22 @@ renderer.domElement.addEventListener('pointermove', (e) => {
     updateOriginPlaneHover(e.clientX, e.clientY);
     return;
   }
+  if (activeSketchId && (isSketchPrimitiveTool(tool) || tool === 'edit' || tool === 'polyline' || tool === 'freehand')) {
+    const hover = pickOnPlane(
+      e.clientX,
+      e.clientY,
+      renderer.domElement,
+      camera,
+      workPlaneMesh,
+      ac().group,
+      planeAxis,
+      planePosition,
+    );
+    if (hover) applySketchSnap(hover);
+    else setSketchOriginSnapFeedback(false);
+  }
   if (tool === 'sketch-dim') {
-    handleSketchDimPointerMove(e.clientX, e.clientY);
+    sketchDims.handlePointerMove(e.clientX, e.clientY);
     return;
   }
   if (tool === 'polyline') {
@@ -4287,7 +4306,7 @@ window.addEventListener('pointerup', (e) => {
   }
   if (smoothPaint) {
     endSmoothPaint();
-    controls.enabled = orbitToolActive();
+    syncOrbitControls();
     if (renderer.domElement.hasPointerCapture(e.pointerId)) {
       renderer.domElement.releasePointerCapture(e.pointerId);
     }
@@ -4296,7 +4315,7 @@ window.addEventListener('pointerup', (e) => {
   if (meshEditDrag) {
     const body = cadScene.getBody(meshEditDrag.bodyId);
     meshEditDrag = null;
-    controls.enabled = orbitToolActive();
+    syncOrbitControls();
     if (renderer.domElement.hasPointerCapture(e.pointerId)) {
       renderer.domElement.releasePointerCapture(e.pointerId);
     }
@@ -4310,16 +4329,25 @@ window.addEventListener('pointerup', (e) => {
   }
   if (editDrag) {
     editDrag = null;
-    controls.enabled = orbitToolActive();
+    syncOrbitControls();
     if (renderer.domElement.hasPointerCapture(e.pointerId)) {
       renderer.domElement.releasePointerCapture(e.pointerId);
     }
     setStatus('Kontur angepasst — Rechtsklick auf Punkt für Kurventyp');
     return;
   }
+  if (sketchDims.shouldFinishPlacement()) {
+    syncOrbitControls();
+    if (renderer.domElement.hasPointerCapture(e.pointerId)) {
+      renderer.domElement.releasePointerCapture(e.pointerId);
+    }
+    sketchDimCapturePointerId = null;
+    sketchDims.finishDrag();
+    return;
+  }
   if (draggingPlane) {
     draggingPlane = false;
-    controls.enabled = orbitToolActive() && !transformControls.dragging;
+    syncOrbitControls();
     if (renderer.domElement.hasPointerCapture(e.pointerId)) {
       renderer.domElement.releasePointerCapture(e.pointerId);
     }
@@ -4400,20 +4428,19 @@ sketchGridSnapEl?.addEventListener('change', () => {
 
 document.getElementById('sketch-unit')?.addEventListener('change', (e) => {
   sketchUnit = (e.target as HTMLSelectElement).value as SketchUnit;
-  rebuildSketchDimensions();
-  refreshSketchDimList();
+  sketchDims.onUnitChanged();
 });
 
-document.getElementById('sketch-dim-kind')?.addEventListener('change', (e) => {
-  sketchDimKind = (e.target as HTMLSelectElement).value as SketchDimensionKind;
-  clearDimPick();
+sketchDims.bindUi(() => {
+  sketchDimKind = (document.getElementById('sketch-dim-kind') as HTMLSelectElement).value as SketchDimensionKind;
+  sketchDims.clearSession();
   if (tool === 'sketch-dim') {
     setStatus(
       sketchDimKind === 'linear'
-        ? 'Strecke: 1. Punkt → 2. Punkt → Maßlinie setzen'
+        ? 'Strecke: Kante anfahren → klicken → Maßlinie ziehen → Wert eingeben'
         : sketchDimKind === 'radius'
-          ? 'Radius: Mittelpunkt → Kreisrand'
-          : 'Durchmesser: Mittelpunkt → Kreisrand',
+          ? 'Radius: Kreis anfahren → klicken → Maßlinie ziehen → Wert eingeben'
+          : 'Durchmesser: Kreis anfahren → klicken → Maßlinie ziehen → Wert eingeben',
     );
   }
 });
@@ -4502,7 +4529,7 @@ document.getElementById('close-contour')!.addEventListener('click', () => {
     saveActiveDraft({ recordUndo: false });
     return;
   }
-  pushUndo();
+  pushUndo('Kontur schließen');
   activeDraft.closed = true;
   closeSnapPreview = false;
   renderDraftLine();
@@ -4516,7 +4543,7 @@ document.getElementById('discard-draft')!.addEventListener('click', () => {
     return;
   }
   const n = activeDraft.points.length;
-  pushUndo();
+  pushUndo('Entwurf verwerfen');
   activeDraft = null;
   clearDraftVisuals();
   const ready = closedContourCount();
@@ -4526,14 +4553,8 @@ document.getElementById('discard-draft')!.addEventListener('click', () => {
     statusWhenNoOpenDraft();
   }
 });
-document.getElementById('undo-point')!.addEventListener('click', () => {
-  if (activeDraft && activeDraft.points.length) {
-    pushUndo();
-    activeDraft.points.pop();
-    renderDraftLine();
-    setStatus(`Letzter Punkt entfernt — noch ${activeDraft.points.length} Punkte`);
-  }
-});
+document.getElementById('undo-point')!.addEventListener('click', () => performUndo());
+document.getElementById('redo-point')!.addEventListener('click', () => performRedo());
 
 document.getElementById('loft-form')!.addEventListener('click', () => void buildLoft());
 document.getElementById('export-stl')!.addEventListener('click', exportForm);
@@ -4584,19 +4605,21 @@ projectFile.addEventListener('change', async () => {
   projectFile.value = '';
 });
 function clearAllContours() {
-  if (contours.length || activeDraft || sketches.length || sketchDimensions.length) pushUndo();
+  if (contours.length || activeDraft || sketches.length || sketchDimensions.length) pushUndo('Alles löschen');
   contours = [];
   sketches = [];
   sketchDimensions = [];
   activeSketchId = null;
-  clearDimPick();
+  sketchDims.clearSession();
   updateOriginPlaneHighlight(null);
   drawGroup.clear();
   activeDraft = null;
   clearDraftVisuals();
-  rebuildSketchDimensions();
-  refreshSketchDimList();
+  sketchDims.rebuild();
+  sketchDims.refreshList();
   refreshContourList();
+  updateSketchRibbonState(null, 'sketch-pick');
+  if (appMenu.active === 'sketch') setTool('sketch-pick');
 }
 
 document.getElementById('clear-contours')!.addEventListener('click', clearAllContours);
@@ -4619,14 +4642,6 @@ async function reloadScanFromBuffer() {
 
 document.getElementById('reload-scan')!.addEventListener('click', () => void reloadScanFromBuffer());
 document.getElementById('reload-scan-panel')!.addEventListener('click', () => void reloadScanFromBuffer());
-
-const SCAN_MODE_LABELS: Record<ScanDisplayMode, string> = {
-  cad: 'CAD hell (Kanten)',
-  flaeche: 'Fläche + Kanten',
-  kontrast: 'Farbkontrast',
-  punkte: 'Geschlossene Flächen',
-  dunkel: 'Dunkel',
-};
 
 document.getElementById('scan-mode')!.addEventListener('change', (e: Event) => {
   const mode = (e.target as HTMLSelectElement).value as ScanDisplayMode;
@@ -4898,15 +4913,12 @@ document.addEventListener('pointerdown', (e) => {
   }
 });
 
-function isTypingTarget(target: EventTarget | null) {
-  const tag = (target as HTMLElement)?.tagName;
-  return tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA';
-}
-
 function handleFusionCancel(): boolean {
   let consumed = false;
-  if (dimPick) {
-    clearDimPick();
+  if (sketchDims.hasSession || sketchDims.preselectedEdge) {
+    sketchDims.clearSession();
+    if (tool === 'sketch-dim') setTool('navigate');
+    syncOrbitControls();
     consumed = true;
   }
   if (sketchInteraction) {
@@ -4989,39 +5001,36 @@ function applyFusionShortcutAction(action: FusionShortcutAction) {
   }
 }
 
-function renderFusionShortcutsPanel() {
-  const host = document.getElementById('fusion-shortcuts-list');
-  if (!host) return;
-  host.innerHTML = FUSION_SHORTCUTS.map(
-    (s) =>
-      `<tr><td><kbd>${s.keys}</kbd></td><td>${s.action}</td><td class="shortcut-scope">${s.scope}</td></tr>`,
-  ).join('');
-}
-
 window.addEventListener('keydown', (e) => {
-  if (isTypingTarget(e.target)) return;
+  if (e.key === 'Shift' && !shiftKeyHeld) {
+    shiftKeyHeld = true;
+    syncOrbitControls();
+  }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.key === 'Shift' && shiftKeyHeld) {
+    shiftKeyHeld = false;
+    syncOrbitControls();
+  }
+});
+window.addEventListener('blur', () => {
+  if (!shiftKeyHeld) return;
+  shiftKeyHeld = false;
+  syncOrbitControls();
+});
 
-  if (e.key === 'Escape') {
-    if (handleFusionCancel()) {
-      e.preventDefault();
-      setStatus('Abgebrochen (Esc)');
-      return;
-    }
+bindFusionKeyboard({
+  getTool: () => tool,
+  getActiveSketchId: () => activeSketchId,
+  onCancel: handleFusionCancel,
+  onAction: applyFusionShortcutAction,
+  closeMenus: () => {
     hideViewportMenu();
     hidePointMenu();
     hideBodyColorMenu();
     hideBrowserContextMenu();
     appMenu.closeAll();
-    e.preventDefault();
-    return;
-  }
-
-  const action = resolveFusionShortcut(e, { tool, activeSketchId });
-  if (!action) return;
-  if (action.type === 'cancel') return;
-
-  e.preventDefault();
-  applyFusionShortcutAction(action);
+  },
 });
 
 window.addEventListener('resize', resize);
@@ -5033,12 +5042,9 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
   viewCube.update(delta);
-  controls.enabled =
-    !viewCube.animating &&
-    !viewCube.dragging &&
-    !transformControls.dragging &&
-    orbitToolActive();
+  syncOrbitControls();
   controls.update();
+  if (activeSketchId && sketchDimGroup.visible) sketchDims.updateScreenScales();
   syncAttachedContourDisplay();
   renderer.render(scene, camera);
   viewCube.render();
@@ -5053,6 +5059,8 @@ async function boot() {
   refreshSketchGridUi();
   setupEmptyProjectView();
   refreshBrowserPanel();
+  updateSketchRibbonState(null, 'sketch-pick');
+  refreshHistoryTimeline();
   animate();
   await initWasm();
   appMenu.selectTab('sketch', false);

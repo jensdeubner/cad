@@ -32,7 +32,7 @@ export const FUSION_SHORTCUTS: FusionShortcutEntry[] = [
   { keys: 'C', action: 'Kreis', scope: 'Skizze aktiv' },
   { keys: 'R', action: 'Rechteck', scope: 'Skizze aktiv' },
   { keys: 'A', action: 'Bogen (3 Punkte)', scope: 'Skizze aktiv' },
-  { keys: 'D', action: 'Bemaßung', scope: 'Skizze aktiv' },
+  { keys: 'D', action: 'Bemaßung (Kante wählen → Maßlinie ziehen → Wert)', scope: 'Skizze aktiv' },
   { keys: 'E', action: 'Bearbeiten', scope: 'Skizze aktiv' },
   { keys: 'Esc', action: 'Abbrechen / Panels schließen', scope: 'Global' },
   { keys: 'F', action: 'Ansicht anpassen (Fit)', scope: 'Global' },
@@ -48,6 +48,7 @@ export const FUSION_SHORTCUTS: FusionShortcutEntry[] = [
   { keys: 'P', action: 'Press Pull', scope: 'Körper' },
   { keys: 'Strg+Z', action: 'Rückgängig', scope: 'Global' },
   { keys: 'Strg+Umschalt+Z', action: 'Wiederholen', scope: 'Global' },
+  { keys: 'Verlauf', action: 'Timeline unten — Schritt anklicken zum Springen', scope: 'Global' },
   { keys: 'Strg+Y', action: 'Wiederholen', scope: 'Global' },
   { keys: 'Strg+S', action: 'Projekt speichern', scope: 'Global' },
 ];

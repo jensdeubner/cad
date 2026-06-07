@@ -1,5 +1,9 @@
+/**
+ * Core domain types shared across sketch, contour, and tool routing.
+ */
 import type * as THREE from 'three';
 
+/** Work-plane orientation for contours and sketches. */
 export type PlaneAxis = 'xy' | 'xz' | 'yz';
 export type Tool =
   | 'navigate'

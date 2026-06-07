@@ -40,9 +40,59 @@ export function sketch2DToWorld(u: number, v: number, frame: SketchPlaneFrame): 
     .add(frame.bitangent.clone().multiplyScalar(v));
 }
 
-export function snapSketch2D(u: number, v: number, spacing: number): [number, number] {
-  if (spacing <= 0) return [u, v];
-  return [Math.round(u / spacing) * spacing, Math.round(v / spacing) * spacing];
+export function sketchPlaneOrigin(axis: PlaneAxis, position: number): THREE.Vector3 {
+  return sketchPlaneFrame(axis, position).origin.clone();
+}
+
+/** Screen-independent snap radius around sketch origin (0,0) in plane UV. */
+export function sketchOriginSnapThreshold(spacing: number): number {
+  return Math.max(spacing * 0.55, 4);
+}
+
+export function isNearSketchOrigin2D(u: number, v: number, spacing: number): boolean {
+  const t = sketchOriginSnapThreshold(spacing);
+  return Math.hypot(u, v) <= t;
+}
+
+export interface SketchSnapResult {
+  point: THREE.Vector3;
+  snappedOrigin: boolean;
+  snappedGrid: boolean;
+}
+
+export function snapSketch2D(
+  u: number,
+  v: number,
+  spacing: number,
+  snapOrigin = true,
+): { u: number; v: number; snappedOrigin: boolean; snappedGrid: boolean } {
+  if (snapOrigin && isNearSketchOrigin2D(u, v, spacing)) {
+    return { u: 0, v: 0, snappedOrigin: true, snappedGrid: false };
+  }
+  if (spacing <= 0) return { u, v, snappedOrigin: false, snappedGrid: false };
+  return {
+    u: Math.round(u / spacing) * spacing,
+    v: Math.round(v / spacing) * spacing,
+    snappedOrigin: false,
+    snappedGrid: true,
+  };
+}
+
+export function snapSketchPointWithMeta(
+  p: THREE.Vector3,
+  axis: PlaneAxis,
+  position: number,
+  spacing: number,
+  snapOrigin = true,
+): SketchSnapResult {
+  const frame = sketchPlaneFrame(axis, position);
+  const [u, v] = projectToSketch2D(p, frame);
+  const snapped = snapSketch2D(u, v, spacing, snapOrigin);
+  return {
+    point: sketch2DToWorld(snapped.u, snapped.v, frame),
+    snappedOrigin: snapped.snappedOrigin,
+    snappedGrid: snapped.snappedGrid,
+  };
 }
 
 export function snapSketchPoint(
@@ -50,11 +100,9 @@ export function snapSketchPoint(
   axis: PlaneAxis,
   position: number,
   spacing: number,
+  snapOrigin = true,
 ): THREE.Vector3 {
-  const frame = sketchPlaneFrame(axis, position);
-  const [u, v] = projectToSketch2D(p, frame);
-  const [su, sv] = snapSketch2D(u, v, spacing);
-  return sketch2DToWorld(su, sv, frame);
+  return snapSketchPointWithMeta(p, axis, position, spacing, snapOrigin).point;
 }
 
 function circumcircle2D(

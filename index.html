@@ -27,6 +27,9 @@
             <button type="button" id="undo-point" class="quick-btn" title="Rückgängig (Strg+Z)">
               <span class="quick-btn-icon">↩</span>
             </button>
+            <button type="button" id="redo-point" class="quick-btn" title="Wiederholen (Strg+Umschalt+Z)">
+              <span class="quick-btn-icon">↪</span>
+            </button>
             <button type="button" id="save-project" class="quick-btn quick-btn-accent" title="Projekt speichern (.stpr)">
               <span class="quick-btn-icon">💾</span>
             </button>
@@ -104,6 +107,13 @@
               </button>
             </div>
             <div class="ribbon-group">
+              <span class="ribbon-label">Anzeige</span>
+              <button type="button" data-open-panel="body" class="ribbon-btn ribbon-btn-stack" title="Darstellung, Schnitt &amp; Mesh-Optionen">
+                <span class="ribbon-btn-icon">▤</span>
+                <span class="ribbon-btn-label">Eigenschaften</span>
+              </button>
+            </div>
+            <div class="ribbon-group">
               <span class="ribbon-label">Mesh</span>
               <button type="button" id="reload-scan" class="ribbon-btn ribbon-btn-stack">
                 <span class="ribbon-btn-icon">↻</span>
@@ -146,11 +156,11 @@
             </div>
             <div class="ribbon-group">
               <span class="ribbon-label">Ausrichten</span>
-              <button type="button" data-tool="align" class="ribbon-btn ribbon-btn-stack">
+              <button type="button" data-tool="align" data-open-panel="align" class="ribbon-btn ribbon-btn-stack">
                 <span class="ribbon-btn-icon">⟳</span>
                 <span class="ribbon-btn-label">Gizmo</span>
               </button>
-              <button type="button" id="plane-align-open" class="ribbon-btn ribbon-btn-stack">
+              <button type="button" id="plane-align-open" data-open-panel="align" class="ribbon-btn ribbon-btn-stack">
                 <span class="ribbon-btn-icon">▣</span>
                 <span class="ribbon-btn-label">Ebene</span>
               </button>
@@ -181,9 +191,9 @@
                 <span class="ribbon-btn-label">YZ</span>
               </button>
             </div>
-            <div class="ribbon-group">
+            <div class="ribbon-group" data-sketch-active-only>
               <span class="ribbon-label">Zeichnen</span>
-              <button type="button" data-tool="sketch-line" class="ribbon-btn ribbon-btn-stack ribbon-primary" title="Linie (L)">
+              <button type="button" data-tool="sketch-line" class="ribbon-btn ribbon-btn-stack" title="Linie (L)">
                 <span class="ribbon-btn-icon">╱</span>
                 <span class="ribbon-btn-label">Linie <kbd>L</kbd></span>
               </button>
@@ -215,8 +225,12 @@
                 <span class="ribbon-btn-icon">↔</span>
                 <span class="ribbon-btn-label">Bemaßung <kbd>D</kbd></span>
               </button>
+              <button type="button" data-open-panel="sketch" class="ribbon-btn ribbon-btn-stack" title="Skizzen-Einstellungen &amp; Bemaßungsliste">
+                <span class="ribbon-btn-icon">▤</span>
+                <span class="ribbon-btn-label">Einstellungen</span>
+              </button>
             </div>
-            <div class="ribbon-group">
+            <div class="ribbon-group" data-sketch-active-only>
               <span class="ribbon-label">Skizze</span>
               <button type="button" id="finish-sketch" class="ribbon-btn ribbon-btn-stack ribbon-primary" title="Skizze fertig (Enter)">
                 <span class="ribbon-btn-icon">✓</span>
@@ -227,9 +241,13 @@
                 <span class="ribbon-btn-label">Profil speichern</span>
               </button>
             </div>
-            <div class="ribbon-group ribbon-group-hint">
+            <div class="ribbon-group ribbon-group-hint" data-sketch-active-only>
               <span class="ribbon-label">Hinweis</span>
-              <p class="ribbon-hint">Raster + Mittelpunkt auf der Skizze · Linie/Kreis ziehen · Bogen/Dreieck = 3 Klicks · <strong>Skizze fertig</strong></p>
+              <p class="ribbon-hint">Rad=Zoom · Mitte=Schwenken · Umschalt+Mitte=Drehen · Linie/Kreis · Bemaßung: Kante → Maßlinie → Wert</p>
+            </div>
+            <div class="ribbon-group ribbon-group-hint sketch-pick-hint">
+              <span class="ribbon-label">Hinweis</span>
+              <p class="ribbon-hint">Zuerst <strong>Neue Skizze</strong> oder <strong>XY / XZ / YZ</strong> — dann erscheinen die Zeichenwerkzeuge.</p>
             </div>
           </div>
 
@@ -271,6 +289,10 @@
                 <span class="ribbon-btn-icon">×</span>
                 <span class="ribbon-btn-label">Entwurf weg</span>
               </button>
+              <button type="button" data-open-panel="draw" class="ribbon-btn ribbon-btn-stack" title="Zeichen-Hilfe &amp; Hinweise">
+                <span class="ribbon-btn-icon">▤</span>
+                <span class="ribbon-btn-label">Hilfe</span>
+              </button>
             </div>
           </div>
 
@@ -293,20 +315,28 @@
                 <span class="ribbon-btn-icon">▮</span>
                 <span class="ribbon-btn-label">Seite</span>
               </button>
+              <button type="button" data-open-panel="view" class="ribbon-btn ribbon-btn-stack" title="Tastenkürzel &amp; Ansicht-Hilfe">
+                <span class="ribbon-btn-icon">▤</span>
+                <span class="ribbon-btn-label">Kürzel</span>
+              </button>
             </div>
           </div>
 
           <div class="ribbon-workspace hidden" data-ribbon="contours">
             <div class="ribbon-group">
               <span class="ribbon-label">Form</span>
-              <button type="button" id="loft-form" class="ribbon-btn ribbon-btn-stack ribbon-primary">
+              <button type="button" id="loft-form" data-open-panel="contours" class="ribbon-btn ribbon-btn-stack ribbon-primary">
                 <span class="ribbon-btn-icon">⬡</span>
                 <span class="ribbon-btn-label">Negativform</span>
+              </button>
+              <button type="button" data-open-panel="contours" class="ribbon-btn ribbon-btn-stack" title="Konturen verwalten">
+                <span class="ribbon-btn-icon">▤</span>
+                <span class="ribbon-btn-label">Konturen</span>
               </button>
             </div>
             <div class="ribbon-group">
               <span class="ribbon-label">Verwalten</span>
-              <button type="button" id="clear-contours" class="ribbon-btn ribbon-btn-stack ribbon-danger">
+              <button type="button" id="clear-contours" data-open-panel="contours" class="ribbon-btn ribbon-btn-stack ribbon-danger">
                 <span class="ribbon-btn-icon">⌫</span>
                 <span class="ribbon-btn-label">Alle löschen</span>
               </button>
@@ -329,7 +359,14 @@
 
         <div class="viewport-wrap">
         <main id="viewport" class="tool-navigate">
-          <div id="tool-hint" class="tool-hint">Links drehen · Mitte schieben · Rechtsklick = Kontextmenü</div>
+          <div id="tool-hint" class="tool-hint">Mausrad=Zoom · Mitte=Schwenken · Umschalt+Mitte=Drehen · Links=Werkzeug</div>
+          <div id="sketch-dim-hud" class="sketch-dim-hud hidden" role="dialog" aria-label="Bemaßung eingeben">
+            <span class="sketch-dim-hud-title">Maß eingeben</span>
+            <input id="sketch-dim-hud-value" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" />
+            <span id="sketch-dim-hud-unit" class="sketch-dim-hud-unit">mm</span>
+            <button type="button" id="sketch-dim-hud-apply" class="sketch-dim-hud-apply">OK</button>
+            <span class="sketch-dim-hud-hint">Enter · Esc abbrechen</span>
+          </div>
           <div id="transform-toolbar" class="transform-toolbar hidden">
             <button type="button" data-tmode="translate" class="active" title="Verschieben (G)">↔ Verschieben</button>
             <button type="button" data-tmode="rotate" title="Drehen (R)">⟳ Drehen</button>
@@ -479,13 +516,14 @@
               <button type="button" class="fp-close" aria-label="Schließen">×</button>
             </header>
             <div class="fp-body">
-              <p class="fp-lead">Wie Fusion 360: Leeres Projekt zeigt Ursprung mit <strong>XY</strong>, <strong>XZ</strong>, <strong>YZ</strong> — Ebene anklicken zum Skizzieren.</p>
+              <p class="fp-lead" id="sketch-panel-pick-hint">Wie Fusion 360: Ursprung mit <strong>XY</strong>, <strong>XZ</strong>, <strong>YZ</strong> — Ebene anklicken, dann Zeichenwerkzeuge.</p>
+              <div id="sketch-panel-draw-hint" data-sketch-active-only class="hidden">
               <ul class="fp-list">
                 <li><strong>Linie / Kreis / Rechteck</strong> — anklicken &amp; ziehen</li>
                 <li><strong>Bogen / Dreieck</strong> — 3 Punkte setzen</li>
                 <li><strong>Freihand</strong> — gedrückt halten &amp; ziehen</li>
                 <li><strong>Bearbeiten</strong> — gespeicherte Profile anpassen</li>
-                <li><strong>Bemaßung</strong> — 2 Punkte + Lage der Maßlinie (Strecke) oder Mittelpunkt + Rand (Kreis)</li>
+                <li><strong>Bemaßung</strong> — Kante anklicken · <kbd>D</kbd> · Maßlinie hochziehen · mm/cm eingeben</li>
               </ul>
               <label class="fp-row">Bemaßungsart
                 <select id="sketch-dim-kind">
@@ -502,10 +540,20 @@
                   <option value="in">in (Zoll)</option>
                 </select>
               </label>
+              <div id="sketch-dim-input-row" class="fp-dim-input hidden">
+                <label class="fp-row">Maß eingeben
+                  <div class="fp-dim-input-group">
+                    <input id="sketch-dim-value" type="number" step="0.1" min="0.001" inputmode="decimal" />
+                    <span id="sketch-dim-unit-label" class="fp-dim-unit">mm</span>
+                    <button type="button" id="sketch-dim-apply" class="fp-secondary">OK</button>
+                  </div>
+                </label>
+              </div>
               <label class="fp-row">Raster (mm) <input id="sketch-grid-spacing" type="range" min="1" max="50" value="10" /></label>
               <ul id="sketch-dim-list" class="fp-dim-list"></ul>
               <p class="fp-hint" id="sketch-grid-spacing-val">10 mm · Einrasten aktiv</p>
-              <label class="fp-check"><input id="sketch-grid-snap" type="checkbox" checked /> Am Raster einrasten</label>
+              <label class="fp-check"><input id="sketch-grid-snap" type="checkbox" checked /> Am Raster &amp; Skizzenmittelpunkt einrasten</label>
+              </div>
             </div>
           </aside>
 
@@ -609,6 +657,15 @@
         </main>
         <div id="view-cube-host" class="view-cube-host" aria-label="ViewCube"></div>
         </div>
+      </div>
+
+      <div id="fusion-timeline" class="fusion-timeline" aria-label="Verlauf">
+        <div class="timeline-toolbar">
+          <button type="button" id="timeline-undo" class="timeline-nav-btn" title="Rückgängig (Strg+Z)" aria-label="Rückgängig">◀</button>
+          <button type="button" id="timeline-redo" class="timeline-nav-btn" title="Wiederholen (Strg+Umschalt+Z)" aria-label="Wiederholen">▶</button>
+          <span id="timeline-position" class="timeline-position">Keine Schritte</span>
+        </div>
+        <div id="timeline-track" class="timeline-track" role="list"></div>
       </div>
 
       <footer id="status">Geometrie laden oder vorhandenes Projekt öffnen</footer>

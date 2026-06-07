@@ -31,6 +31,9 @@ export interface ProjectSketchDimension {
   b: [number, number, number];
   offset: number;
   visible: boolean;
+  contourId?: string;
+  pointIndex0?: number;
+  pointIndex1?: number;
 }
 
 export interface ProjectContour {
