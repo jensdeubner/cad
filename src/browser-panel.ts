@@ -1,4 +1,6 @@
+import { bodyKindBadgeKey, type BodyKind } from './body-kind';
 import type { CadBodyId, CadComponentId } from './cad-scene';
+import { t } from './i18n';
 
 export type BrowserItemId =
   | `component:${CadComponentId}`
@@ -20,6 +22,7 @@ export interface BrowserBodyItem {
   id: CadBodyId;
   label: string;
   meshName: string;
+  bodyKind: BodyKind;
   hasMesh: boolean;
   visible: boolean;
   wireVisible: boolean;
@@ -65,7 +68,7 @@ export interface BrowserComponentItem {
 
 export interface BrowserPanelModel {
   componentsFolderExpanded: boolean;
-  activeBodyId: CadBodyId;
+  activeBodyId: CadBodyId | '';
   activeSketchId: string | null;
   originPlanesVisible: boolean;
   components: BrowserComponentItem[];
@@ -138,8 +141,8 @@ function componentRow(comp: BrowserComponentItem): string {
     loaded.length > 0
       ? loaded.map((b) => `${b.label} (${b.meshName})`).join(', ')
       : comp.bodies.length > 0
-        ? `${comp.bodies.length} Körper — STL laden`
-        : 'kein Körper';
+        ? t('browser.bodyCount', { count: comp.bodies.length })
+        : t('browser.noBody');
   return `<div class="browser-item browser-leaf browser-component" data-indent="1" data-context-component="${comp.id}">
     <button type="button" class="browser-caret ${comp.expanded ? 'expanded' : ''}" data-folder="component:${comp.id}" aria-label="Komponente aufklappen">▸</button>
     ${visCell(`component:${comp.id}`, comp.visible)}
@@ -149,15 +152,18 @@ function componentRow(comp: BrowserComponentItem): string {
 }
 
 function bodyRow(b: BrowserBodyItem, active: boolean): string {
-  const tag = b.hasMesh ? 'Mesh' : 'leer';
-  const tagClass = b.hasMesh ? '' : 'is-open';
+  const meshTag = b.hasMesh ? t('browser.mesh') : t('browser.empty');
+  const meshTagClass = b.hasMesh ? '' : 'is-open';
+  const kindTag = b.hasMesh ? t(bodyKindBadgeKey(b.bodyKind, b.meshName)) : '';
+  const kindTagClass = b.hasMesh ? `browser-tag-kind-${b.bodyKind}` : '';
   const activeClass = active ? ' is-active-body' : '';
   return `<div class="browser-item browser-leaf browser-body${activeClass}" data-indent="4" data-select-body="${b.id}">
     <button type="button" class="browser-caret ${b.expanded ? 'expanded' : ''}" data-folder="body-group:${b.id}" aria-label="Körper aufklappen">▸</button>
     ${visCell(`body:${b.id}`, b.visible)}
     <span class="browser-label">${b.label}</span>
-    <span class="browser-meta">${b.hasMesh ? b.meshName : 'STL laden…'}</span>
-    <span class="browser-tag ${tagClass}">${tag}</span>
+    <span class="browser-meta">${b.hasMesh ? b.meshName : t('browser.loadStl')}</span>
+    <span class="browser-tag ${meshTagClass}">${meshTag}</span>
+    ${kindTag ? `<span class="browser-tag ${kindTagClass}">${kindTag}</span>` : ''}
   </div>`;
 }
 
@@ -205,7 +211,7 @@ export class BrowserPanel {
     const parts: string[] = [];
 
     parts.push(
-      folderRow('components', 'Komponenten', model.componentsFolderExpanded, 0, model.components.length),
+      folderRow('components', t('browser.components'), model.componentsFolderExpanded, 0, model.components.length),
     );
 
     if (model.componentsFolderExpanded) {
@@ -215,13 +221,13 @@ export class BrowserPanel {
         if (comp.expanded) {
           parts.push('<div class="browser-tree-group">');
           parts.push(
-            folderRow(`component-bodies:${comp.id}`, 'Körper', comp.bodiesExpanded, 2, comp.bodies.length),
+            folderRow(`component-bodies:${comp.id}`, t('browser.bodies'), comp.bodiesExpanded, 2, comp.bodies.length),
           );
           if (comp.bodiesExpanded) {
             if (!comp.bodies.length) {
               parts.push(
                 `<div class="browser-item browser-leaf browser-muted" data-indent="3">
-                  <span class="browser-spacer"></span><span class="browser-label">Kein Körper in dieser Komponente</span>
+                  <span class="browser-spacer"></span><span class="browser-label">${t('browser.emptyBody')}</span>
                 </div>`,
               );
             }
@@ -230,14 +236,14 @@ export class BrowserPanel {
               if (b.expanded && b.hasMesh) {
                 parts.push('<div class="browser-tree-group browser-body-group">');
                 parts.push(
-                  leafRow(`body-wire:${b.id}`, 'Kanten', 'Wireframe', b.wireVisible, { indent: 5 }),
-                  leafRow(`body-points:${b.id}`, 'Punkte', 'Punktwolke', b.pointsVisible, { indent: 5 }),
+                  leafRow(`body-wire:${b.id}`, t('browser.edges'), t('browser.edgesMeta'), b.wireVisible, { indent: 5 }),
+                  leafRow(`body-points:${b.id}`, t('browser.points'), t('browser.pointsMeta'), b.pointsVisible, { indent: 5 }),
                   leafRow(
                     `body-trace:${b.id}`,
-                    'Nachzeichnen',
-                    'Festkörper',
+                    t('browser.trace'),
+                    t('browser.traceMeta'),
                     b.traceAssistVisible,
-                    { indent: 5, tag: b.traceAssistVisible ? 'Ein' : '', tagClass: b.traceAssistVisible ? 'is-live' : '' },
+                    { indent: 5, tag: b.traceAssistVisible ? t('browser.traceOn') : '', tagClass: b.traceAssistVisible ? 'is-live' : '' },
                   ),
                 );
                 parts.push('</div>');
@@ -248,7 +254,7 @@ export class BrowserPanel {
           parts.push(
             folderRow(
               `component-sketches:${comp.id}`,
-              'Skizzen',
+              t('browser.sketches'),
               comp.sketchesExpanded,
               2,
               comp.sketches.length,
@@ -262,21 +268,26 @@ export class BrowserPanel {
                 ${visCell(`sketch:${sk.id}`, sk.visible)}
                 <span class="browser-label">${sk.label}</span>
                 <span class="browser-meta">${sk.axis.toUpperCase()} @ ${sk.position.toFixed(1)}</span>
-                <span class="browser-tag">${sk.profileCount} Profil(e)</span>
+                <span class="browser-tag">${t('browser.profileCount', { count: sk.profileCount })}</span>
               </div>`);
               if (sk.expanded) {
                 parts.push('<div class="browser-tree-group">');
                 if (!sk.contours.length) {
                   parts.push(`<div class="browser-item browser-leaf browser-muted" data-indent="4">
-                    <span class="browser-spacer"></span><span class="browser-label">Noch kein Profil</span>
+                    <span class="browser-spacer"></span><span class="browser-label">${t('browser.emptyProfile')}</span>
                   </div>`);
                 }
                 for (const c of sk.contours) {
                   const pinned = c.attachedToBodyId != null;
+                  const bodyLabel = c.attachedBodyLabel ?? t('browser.bodies');
                   const pinTitle = pinned
-                    ? `Geheftet an ${c.attachedBodyLabel ?? 'Körper'}`
-                    : 'Am Körper heften';
-                  const tag = pinned ? `↗ ${c.attachedBodyLabel ?? 'Körper'}` : c.closed ? 'geschlossen' : 'offen';
+                    ? t('browser.pinAttached', { label: bodyLabel })
+                    : t('browser.pinAttach');
+                  const tag = pinned
+                    ? t('browser.pinned', { label: bodyLabel })
+                    : c.closed
+                      ? t('browser.closed')
+                      : t('browser.open');
                   parts.push(
                     leafRow(`contour:${c.id}`, c.name, c.meta, c.visible, {
                       indent: 4,
@@ -294,7 +305,7 @@ export class BrowserPanel {
             }
             if (!comp.sketches.length) {
               parts.push(`<div class="browser-item browser-leaf browser-muted" data-indent="3">
-                <span class="browser-spacer"></span><span class="browser-label">Ebene wählen (Skizze-Reiter)</span>
+                <span class="browser-spacer"></span><span class="browser-label">${t('browser.selectPlane')}</span>
               </div>`);
             }
           }
@@ -302,7 +313,7 @@ export class BrowserPanel {
           parts.push(
             folderRow(
               `component-contours:${comp.id}`,
-              'Konturen (alle)',
+              t('browser.contoursAll'),
               comp.contoursExpanded,
               2,
               comp.contours.length,
@@ -311,9 +322,9 @@ export class BrowserPanel {
           if (comp.contoursExpanded) {
             if (model.hasDraft) {
               parts.push(
-                leafRow('draft', 'Entwurf', model.draftInfo, model.draftVisible, {
+                leafRow('draft', t('browser.draft'), model.draftInfo, model.draftVisible, {
                   indent: 4,
-                  tag: 'live',
+                  tag: t('browser.draft'),
                   tagClass: 'is-live',
                 }),
               );
@@ -321,20 +332,21 @@ export class BrowserPanel {
             if (!comp.contours.length && !model.hasDraft) {
               parts.push(
                 `<div class="browser-item browser-leaf browser-muted" data-indent="4">
-                  <span class="browser-spacer"></span><span class="browser-label">Noch keine Kontur</span>
+                  <span class="browser-spacer"></span><span class="browser-label">${t('browser.emptyContour')}</span>
                 </div>`,
               );
             }
             for (const c of comp.contours) {
               const pinned = c.attachedToBodyId != null;
+              const bodyLabel = c.attachedBodyLabel ?? t('browser.bodies');
               const pinTitle = pinned
-                ? `Geheftet an ${c.attachedBodyLabel ?? 'Körper'} — klicken zum Lösen`
-                : 'Am Körper heften — bewegt sich mit Komponente';
+                ? t('browser.pinAttachedClick', { label: bodyLabel })
+                : t('browser.pinAttachMove');
               const tag = pinned
-                ? `↗ ${c.attachedBodyLabel ?? 'Körper'}`
+                ? t('browser.pinned', { label: bodyLabel })
                 : c.closed
-                  ? 'geschlossen'
-                  : 'offen';
+                  ? t('browser.closed')
+                  : t('browser.open');
               parts.push(
                 leafRow(`contour:${c.id}`, c.name, c.meta, c.visible, {
                   indent: 4,
@@ -351,11 +363,11 @@ export class BrowserPanel {
               parts.push(`<div class="browser-actions" data-indent="4">`);
               if (model.canBuildForm) {
                 parts.push(
-                  `<button type="button" class="browser-action browser-action-primary" data-action="build-form">Negativform als Körper speichern</button>`,
+                  `<button type="button" class="browser-action browser-action-primary" data-action="build-form">${t('browser.buildForm')}</button>`,
                 );
               }
               parts.push(
-                `<button type="button" class="browser-action" data-action="clear-contours">Alle Konturen löschen</button></div>`,
+                `<button type="button" class="browser-action" data-action="clear-contours">${t('browser.clearContours')}</button></div>`,
               );
             }
           }
@@ -367,17 +379,22 @@ export class BrowserPanel {
     parts.push(
       leafRow(
         'origin-planes',
-        'Ursprungsebenen XY/XZ/YZ',
-        model.originPlanesVisible ? 'sichtbar' : 'aus',
+        t('browser.originPlanes'),
+        model.originPlanesVisible ? t('browser.visible') : t('browser.hidden'),
         model.originPlanesVisible,
       ),
-      leafRow('plane', 'Arbeitsebene', `${model.planeVisible ? 'sichtbar' : 'aus'}`, model.planeVisible),
-      leafRow('grid', 'Bodenraster', 'Hilfslinien', model.gridVisible),
+      leafRow(
+        'plane',
+        t('browser.workPlane'),
+        model.planeVisible ? t('browser.visible') : t('browser.hidden'),
+        model.planeVisible,
+      ),
+      leafRow('grid', t('browser.floorGrid'), t('browser.floorGridMeta'), model.gridVisible),
     );
 
     if (model.hasForm) {
       parts.push(
-        leafRow('form', 'Negativform (Ergebnis)', model.formInfo, model.formVisible, { canDelete: true }),
+        leafRow('form', t('browser.negativeForm'), model.formInfo, model.formVisible, { canDelete: true }),
       );
     }
 

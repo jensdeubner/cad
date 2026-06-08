@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { cloneHandle } from './contour-spline';
+import type { BodyKind } from './body-kind';
 import type { BodyTransform } from './cad-body';
 import { cloneSketchDimension, type SketchDimension } from './sketch-dimension';
 import type { Sketch } from './sketch';
@@ -12,6 +13,7 @@ export interface AppSnapshot {
   bodyTransforms: Record<string, BodyTransform>;
   /** Gesetzt bei Mesh-Bearbeitung — tiefe Kopie der STL-Puffer */
   bodyMeshBuffers?: Record<string, ArrayBuffer>;
+  bodyKinds?: Record<string, BodyKind>;
   sketches: Sketch[];
   sketchDimensions: SketchDimension[];
   activeSketchId: string | null;
@@ -57,6 +59,7 @@ export function captureSnapshot(
   alignment: BodyTransform,
   bodyTransforms: Record<string, BodyTransform>,
   bodyMeshBuffers?: Record<string, ArrayBuffer>,
+  bodyKinds?: Record<string, BodyKind>,
   sketches: Sketch[] = [],
   activeSketchId: string | null = null,
   sketchDimensions: SketchDimension[] = [],
@@ -70,12 +73,16 @@ export function captureSnapshot(
         Object.entries(bodyMeshBuffers).map(([id, buf]) => [id, buf.slice(0)]),
       )
     : undefined;
+  const kinds: Record<string, BodyKind> | undefined = bodyKinds
+    ? Object.fromEntries(Object.entries(bodyKinds).map(([id, k]) => [id, k]))
+    : undefined;
   return {
     contours: contours.map(cloneContour),
     activeDraft: activeDraft ? cloneContour(activeDraft) : null,
     alignment: { ...alignment },
     bodyTransforms: transforms,
     bodyMeshBuffers: meshBuffers,
+    bodyKinds: kinds,
     sketches: sketches.map((s) => ({ ...s })),
     sketchDimensions: sketchDimensions.map(cloneSketchDimension),
     activeSketchId,

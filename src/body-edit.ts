@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { export_binary_stl, initWasm } from './wasm';
+import {
+  export_binary_stl,
+  initWasm,
+  mesh_boolean_subtract_json,
+  mesh_boolean_union_json,
+} from './wasm';
 import type { CadBodyRecord } from './cad-scene';
 import { applyAlignment, readAlignmentFromObject, type ScanAlignment } from './scan-align';
 
@@ -342,6 +347,157 @@ export function clipGeometryByPlane(
   out.setIndex(kept);
   out.computeVertexNormals();
   return out;
+}
+
+/** Concatenate body meshes (world space) into one non-indexed-merge geometry. */
+export function mergeBodyGeometries(
+  bodies: CadBodyRecord[],
+): THREE.BufferGeometry | null {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const body of bodies) {
+    if (!body.geometry) continue;
+    body.meshGroup.updateMatrixWorld(true);
+    const g = body.geometry.clone();
+    g.applyMatrix4(body.meshGroup.matrixWorld);
+    parts.push(g);
+  }
+  if (!parts.length) return null;
+
+  let totalVerts = 0;
+  let totalIdx = 0;
+  for (const g of parts) {
+    totalVerts += g.getAttribute('position').count;
+    const idx = g.getIndex();
+    totalIdx += idx ? idx.count : g.getAttribute('position').count;
+  }
+
+  const positions = new Float32Array(totalVerts * 3);
+  const indices = new Uint32Array(totalIdx);
+  let vOff = 0;
+  let iOff = 0;
+
+  for (const g of parts) {
+    const pos = g.getAttribute('position').array as Float32Array;
+    positions.set(pos, vOff * 3);
+    const index = g.getIndex();
+    if (index) {
+      for (let i = 0; i < index.count; i++) {
+        indices[iOff + i] = index.getX(i) + vOff;
+      }
+      iOff += index.count;
+    } else {
+      const n = pos.length / 3;
+      for (let i = 0; i < n; i++) indices[iOff + i] = vOff + i;
+      iOff += n;
+    }
+    vOff += pos.length / 3;
+    g.dispose();
+  }
+
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  out.setIndex(Array.from(indices));
+  out.computeVertexNormals();
+  return out;
+}
+
+function bakeBodyGeometryWorld(body: CadBodyRecord): THREE.BufferGeometry | null {
+  if (!body.geometry) return null;
+  body.meshGroup.updateMatrixWorld(true);
+  const g = body.geometry.clone();
+  g.applyMatrix4(body.meshGroup.matrixWorld);
+  return g;
+}
+
+function meshPayloadFromGeometry(geom: THREE.BufferGeometry): {
+  positions: number[];
+  indices: number[];
+} {
+  const data = geometryMeshData(geom);
+  return {
+    positions: Array.from(data.positions),
+    indices: Array.from(data.indices),
+  };
+}
+
+function parsedMeshToGeometry(mesh: {
+  positions: Float32Array;
+  indices: Uint32Array;
+}): THREE.BufferGeometry {
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
+  geom.setIndex(Array.from(mesh.indices));
+  geom.computeVertexNormals();
+  return geom;
+}
+
+/** Boolean union of bodies in world space. */
+export async function booleanUnionBodies(
+  bodies: CadBodyRecord[],
+): Promise<THREE.BufferGeometry | null> {
+  if (bodies.length < 2) return null;
+
+  const worldParts: THREE.BufferGeometry[] = [];
+  for (const body of bodies) {
+    const g = bakeBodyGeometryWorld(body);
+    if (!g) {
+      worldParts.forEach((p) => p.dispose());
+      return null;
+    }
+    worldParts.push(g);
+  }
+
+  await initWasm();
+  const meshes = worldParts.map((g) => {
+    const payload = meshPayloadFromGeometry(g);
+    g.dispose();
+    return payload;
+  });
+
+  let mesh;
+  try {
+    mesh = mesh_boolean_union_json(JSON.stringify({ meshes }));
+  } catch {
+    return null;
+  }
+
+  return parsedMeshToGeometry(mesh);
+}
+
+/** Boolean subtract tool from target in world space; returns geometry in target local space. */
+export async function booleanSubtractBodies(
+  target: CadBodyRecord,
+  tool: CadBodyRecord,
+): Promise<THREE.BufferGeometry | null> {
+  const targetWorld = bakeBodyGeometryWorld(target);
+  const toolWorld = bakeBodyGeometryWorld(tool);
+  if (!targetWorld || !toolWorld) return null;
+
+  await initWasm();
+  const targetPayload = meshPayloadFromGeometry(targetWorld);
+  const toolPayload = meshPayloadFromGeometry(toolWorld);
+  targetWorld.dispose();
+  toolWorld.dispose();
+
+  let mesh;
+  try {
+    mesh = mesh_boolean_subtract_json(
+      JSON.stringify({
+        target: targetPayload,
+        tool: toolPayload,
+      }),
+    );
+  } catch {
+    return null;
+  }
+
+  const geom = parsedMeshToGeometry(mesh);
+
+  target.meshGroup.updateMatrixWorld(true);
+  const inv = target.meshGroup.matrixWorld.clone().invert();
+  geom.applyMatrix4(inv);
+  geom.computeVertexNormals();
+  return geom;
 }
 
 export function replaceBodyGeometry(body: CadBodyRecord, geom: THREE.BufferGeometry): void {

@@ -1,10 +1,10 @@
-# AGENTS.md — CAD Tracer Onboarding
+# AGENTS.md — CAD Onboarding
 
-This document gives new coding agents enough context to work on **CAD Tracer** (`scan-tracer/`) without re-discovering the codebase from scratch.
+This document gives new coding agents enough context to work on **CAD** without re-discovering the codebase from scratch.
 
 ## What this project is
 
-**CAD Tracer** is a browser-based, Fusion 360–inspired CAD tool for **manual negative-form modeling** from scan meshes and sketches. Users load STL scans, draw contours on work planes, loft closed contours into solid meshes (“Negativform”), edit body meshes, and save everything in a custom `.stpr` project format.
+**CAD** is a browser-based, Fusion 360–inspired CAD tool for **manual negative-form modeling** from scan meshes and sketches. Users load STL scans, draw contours on work planes, loft closed contours into solid meshes (“Negativform”), edit body meshes, and save everything in a custom `.stpr` project format.
 
 It is **not** a full parametric CAD kernel. There is no constraint solver, no feature tree, and no sketch-to-extrude solid modeling like Fusion. The main “solid” path is **lofting closed contours** via Rust WASM.
 
@@ -16,17 +16,17 @@ It is **not** a full parametric CAD kernel. There is no constraint solver, no fe
 
 | Item | Value |
 |------|-------|
-| **Git root** | `scan-tracer/` (not the parent `test5/` folder) |
+| **Git root** | Repository root (this folder) |
 | **Remote** | `https://github.com/jensdeubner/cad.git` |
 | **Default branch** | `main` |
-| **Package name** | `scan-tracer` |
+| **Package name** | `cad` |
 
 The parent folder `test5/` may contain large local STL files (e.g. scan data). `public/scan.stl` is often a symlink for dev — **gitignored** via `*.stl`.
 
 ### Commands
 
 ```bash
-cd scan-tracer
+cd cad
 npm install
 npm run dev          # Vite dev server, port 5173
 npm run build        # build:wasm + vite build
@@ -52,7 +52,7 @@ npm run preview      # preview production build
 ## Directory layout
 
 ```
-scan-tracer/
+cad/
 ├── index.html              # Fusion-style UI shell (tabs, ribbons, panels, browser)
 ├── vite.config.ts
 ├── package.json
@@ -279,7 +279,7 @@ Full list with German descriptions: `FUSION_SHORTCUTS` constant. Hints also appe
 
 1. **`originPlanesGroup` timing** — must be added to the scene **after** `scene` exists (was a past boot error).
 2. **`captureSnapshot` arity** — all call sites must pass `sketches`, `activeSketchId`, `sketchDimensions` where applicable; `snapshotNow()` is the canonical helper.
-3. **Git location** — repo lives in `scan-tracer/`, not `test5/`.
+3. **Git location** — repo root is this project folder.
 4. **Large files** — `*.stl`, `*.stpr` are gitignored; never commit scan data.
 5. **`main.ts` size** — still large (~4800 lines) but refactoring started: `app/`, `sketch-mode/`, `tools/`, `input/`. **Read `src/ARCHITECTURE.md`** before adding features. New logic goes into domain modules with host/factory pattern (see `sketch-mode/dimensions.ts`), not into `main.ts`.
 6. **Save without mesh** — `saveProject()` bails if no `meshBuffer`; document or fix if implementing sketch-only save.
@@ -352,4 +352,4 @@ Built incrementally toward Fusion-like UX:
 
 ## One-paragraph mental model
 
-**CAD Tracer** = Three.js viewer + Fusion-like shell + contour/sketch drawing on planes + Rust WASM for STL I/O, lofting, and project pack/unpack. State lives mainly in `main.ts` arrays (`contours`, `sketches`, `sketchDimensions`) and `CadScene`. Sketches are metadata + contours on origin planes; solids come from lofting closed contours. Prefer small new modules over expanding `main.ts`; keep UI strings German; run `npm run build` before claiming done.
+**CAD** = Three.js viewer + Fusion-like shell + contour/sketch drawing on planes + Rust WASM for STL I/O, lofting, and project pack/unpack. State lives mainly in `main.ts` arrays (`contours`, `sketches`, `sketchDimensions`) and `CadScene`. Sketches are metadata + contours on origin planes; solids come from lofting closed contours. Prefer small new modules over expanding `main.ts`; keep UI strings German; run `npm run build` before claiming done.

@@ -1,7 +1,8 @@
 /**
  * Global Fusion-style keyboard shortcuts and shortcut help panel.
  */
-import { FUSION_SHORTCUTS, resolveFusionShortcut, type FusionShortcutAction } from '../fusion-shortcuts';
+import { FUSION_SHORTCUT_IDS, resolveFusionShortcut, type FusionShortcutAction } from '../fusion-shortcuts';
+import { t } from '../i18n';
 import { isTypingTarget, setStatus } from '../app/util';
 import type { Tool } from '../types';
 
@@ -17,9 +18,9 @@ export interface FusionKeyboardContext {
 export function renderFusionShortcutsPanel() {
   const host = document.getElementById('fusion-shortcuts-list');
   if (!host) return;
-  host.innerHTML = FUSION_SHORTCUTS.map(
-    (s) =>
-      `<tr><td><kbd>${s.keys}</kbd></td><td>${s.action}</td><td class="shortcut-scope">${s.scope}</td></tr>`,
+  host.innerHTML = FUSION_SHORTCUT_IDS.map(
+    (id) =>
+      `<tr><td><kbd>${t(`shortcut.${id}.keys`)}</kbd></td><td>${t(`shortcut.${id}.action`)}</td><td class="shortcut-scope">${t(`shortcut.${id}.scope`)}</td></tr>`,
   ).join('');
 }
 
@@ -31,7 +32,7 @@ export function bindFusionKeyboard(ctx: FusionKeyboardContext) {
     if (e.key === 'Escape') {
       if (ctx.onCancel()) {
         e.preventDefault();
-        setStatus('Abgebrochen (Esc)');
+        setStatus(t('status.cancelled'));
         return;
       }
       ctx.closeMenus();

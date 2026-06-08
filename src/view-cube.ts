@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { t } from './i18n';
 
 export type ViewCubePreset =
   | 'top'
@@ -19,19 +20,11 @@ export interface ViewCubeOptions {
   onOrbitStart?: () => void;
   onOrbitChange?: () => void;
   onOrbitEnd?: () => void;
+  onFlightEnd?: () => void;
 }
 
 const DRAG_THRESHOLD_PX = 4;
 const ORBIT_SPEED = 0.008;
-
-const FACE_LABELS: Record<ViewCubePreset, string> = {
-  right: 'R',
-  left: 'L',
-  front: 'V',
-  back: 'H',
-  top: 'O',
-  bottom: 'U',
-};
 
 const FACE_COLORS: Record<ViewCubePreset, string> = {
   right: '#dbeafe',
@@ -51,6 +44,17 @@ const BOX_FACE_PRESETS: ViewCubePreset[] = [
   'top',
   'bottom',
 ];
+
+function faceLabelsFromI18n(): Record<ViewCubePreset, string> {
+  return {
+    right: t('viewCube.face.right'),
+    left: t('viewCube.face.left'),
+    front: t('viewCube.face.front'),
+    back: t('viewCube.face.back'),
+    top: t('viewCube.face.top'),
+    bottom: t('viewCube.face.bottom'),
+  };
+}
 
 function labelTexture(label: string, color: string): THREE.CanvasTexture {
   const size = 128;
@@ -99,9 +103,12 @@ export class ViewCube {
   private pointerDownX = 0;
   private pointerDownY = 0;
   private isDrag = false;
-  private readonly orbitSpherical = new THREE.Spherical();
-  private readonly orbitOffset = new THREE.Vector3();
+  private pendingFacePreset: ViewCubePreset | null = null;
   private readonly orbitPivot = new THREE.Vector3();
+  private readonly orbitOffset = new THREE.Vector3();
+  private readonly orbitUp = new THREE.Vector3();
+  private readonly orbitRight = new THREE.Vector3();
+  private readonly orbitStep = new THREE.Quaternion();
 
   constructor(
     private mainCamera: THREE.Camera,
@@ -113,9 +120,10 @@ export class ViewCube {
     this.host.classList.add('view-cube-gl');
     this.host.replaceChildren();
 
+    const labels = faceLabelsFromI18n();
     const materials = BOX_FACE_PRESETS.map((preset) =>
       new THREE.MeshStandardMaterial({
-        map: labelTexture(FACE_LABELS[preset], FACE_COLORS[preset]),
+        map: labelTexture(labels[preset], FACE_COLORS[preset]),
         roughness: 0.55,
         metalness: 0.05,
       }),
@@ -172,6 +180,19 @@ export class ViewCube {
     this.cubeRenderer.render(this.scene, this.camera);
   }
 
+  /** Rebuild face label textures after locale change. */
+  refreshFaceLabels() {
+    const labels = faceLabelsFromI18n();
+    const materials = this.cube.material as THREE.MeshStandardMaterial[];
+    for (let i = 0; i < BOX_FACE_PRESETS.length; i++) {
+      const preset = BOX_FACE_PRESETS[i]!;
+      const mat = materials[i]!;
+      mat.map?.dispose();
+      mat.map = labelTexture(labels[preset], FACE_COLORS[preset]);
+      mat.needsUpdate = true;
+    }
+  }
+
   flyTo(preset: ViewCubePreset) {
     const flight = ViewCube.flightFor(preset, this.focus, this.radius);
     this.startPos.copy(this.mainCamera.position);
@@ -191,13 +212,21 @@ export class ViewCube {
     if ('lookAt' in this.mainCamera) {
       (this.mainCamera as THREE.PerspectiveCamera).lookAt(this.focus);
     }
-    if (this.flightT >= 1) this.animating = false;
+    if (this.flightT >= 1) {
+      if (this.animating) {
+        this.animating = false;
+        this.options.onFlightEnd?.();
+      }
+    }
   }
 
   private onPointerDown(e: PointerEvent) {
-    if (this.animating || e.button !== 0) return;
+    if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
+
+    if (this.animating) this.animating = false;
+
     const canvas = this.cubeRenderer.domElement;
     canvas.setPointerCapture(e.pointerId);
     this.pointerId = e.pointerId;
@@ -205,9 +234,8 @@ export class ViewCube {
     this.pointerDownY = e.clientY;
     this.isDrag = false;
     this.dragging = false;
+    this.pendingFacePreset = this.presetAtPointer(e);
     this.orbitPivot.copy(this.options.getPivot());
-    this.orbitOffset.copy(this.mainCamera.position).sub(this.orbitPivot);
-    this.orbitSpherical.setFromVector3(this.orbitOffset);
     this.host.classList.add('view-cube-grabbing');
   }
 
@@ -220,19 +248,27 @@ export class ViewCube {
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
       this.isDrag = true;
       this.dragging = true;
+      this.pendingFacePreset = null;
       this.options.onOrbitStart?.();
     }
-    this.orbitSpherical.theta -= dx * ORBIT_SPEED;
-    this.orbitSpherical.phi = THREE.MathUtils.clamp(
-      this.orbitSpherical.phi - dy * ORBIT_SPEED,
-      0.08,
-      Math.PI - 0.08,
-    );
-    this.orbitOffset.setFromSpherical(this.orbitSpherical);
-    this.mainCamera.position.copy(this.orbitPivot).add(this.orbitOffset);
-    if ('lookAt' in this.mainCamera) {
-      (this.mainCamera as THREE.PerspectiveCamera).lookAt(this.orbitPivot);
-    }
+    const cam = this.mainCamera as THREE.PerspectiveCamera;
+
+    this.orbitUp.copy(cam.up).normalize();
+    this.orbitStep.setFromAxisAngle(this.orbitUp, -dx * ORBIT_SPEED);
+    this.orbitOffset.copy(cam.position).sub(this.orbitPivot);
+    this.orbitOffset.applyQuaternion(this.orbitStep);
+    cam.position.copy(this.orbitPivot).add(this.orbitOffset);
+    cam.up.applyQuaternion(this.orbitStep);
+
+    cam.updateMatrixWorld();
+    this.orbitRight.setFromMatrixColumn(cam.matrixWorld, 0).normalize();
+    this.orbitStep.setFromAxisAngle(this.orbitRight, -dy * ORBIT_SPEED);
+    this.orbitOffset.copy(cam.position).sub(this.orbitPivot);
+    this.orbitOffset.applyQuaternion(this.orbitStep);
+    cam.position.copy(this.orbitPivot).add(this.orbitOffset);
+    cam.up.applyQuaternion(this.orbitStep);
+
+    cam.lookAt(this.orbitPivot);
     this.pointerDownX = e.clientX;
     this.pointerDownY = e.clientY;
     this.options.onOrbitChange?.();
@@ -250,11 +286,13 @@ export class ViewCube {
       this.isDrag = false;
       this.dragging = false;
       this.pointerId = null;
+      this.pendingFacePreset = null;
       this.options.onOrbitEnd?.();
       return;
     }
+    const preset = this.pendingFacePreset ?? this.presetAtPointer(e);
+    this.pendingFacePreset = null;
     this.pointerId = null;
-    const preset = this.presetAtPointer(e);
     if (preset) {
       this.flyTo(preset);
       this.onSelect(preset);

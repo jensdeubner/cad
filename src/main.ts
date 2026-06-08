@@ -1,5 +1,5 @@
 /**
- * CAD Tracer entry point — wires Three.js scene, DOM events, and domain modules.
+ * CAD entry point — wires Three.js scene, DOM events, and domain modules.
  *
  * Orchestration lives here; prefer adding logic under `app/`, `sketch-mode/`,
  * `tools/`, `input/`, or future `contours/`, `scene/`, `project/` packages.
@@ -12,10 +12,12 @@ import {
   initWasm,
   parse_stl_with_stride,
   loft_contours_json,
+  revolve_contour_json,
   export_binary_stl,
-  pack_project,
+  pack_project_multi,
   unpack_project,
 } from './wasm';
+import { assignBodyKind, type BodyKind } from './body-kind';
 import {
   buildProjectMeta,
   parseProjectMeta,
@@ -43,15 +45,15 @@ import {
   countAlignmentHits,
   refineAlignmentPosition,
 } from './scan-plane-align';
-import { AppMenu } from './app-menu';
+import { AppMenu, type FusionTab } from './app-menu';
 import type { FusionShortcutAction } from './fusion-shortcuts';
 import {
   ALIGN_POS_STEP,
   ALIGN_ROT_STEP,
   CONTOUR_COLORS,
-  SCAN_MODE_LABELS,
+  getScanModeLabel,
+  getToolHint,
   SOLID_BODY_COLOR,
-  TOOL_HINTS,
   CLOSED_LINE_COLOR,
   HIT_LINE_COLOR,
   HIT_POINT_COLOR,
@@ -60,7 +62,10 @@ import {
   START_SNAP_COLOR,
 } from './app/constants';
 import { queryDomRefs } from './app/dom';
-import { initStatusElement, setStatus, uid } from './app/util';
+import { initStatusElement, isTypingTarget, setStatus, uid } from './app/util';
+import { initI18n, onLocaleChange, setLocale, getLocale, getLocales, localeLabel, t, refreshDynamicI18n } from './i18n';
+import type { Locale } from './i18n/types';
+import { setWorkspaceModeLabel } from './i18n/dom';
 import type { MeshEditDrag, SmoothPaintSession, SketchInteraction } from './app/types';
 import {
   bodyGizmoTool,
@@ -71,7 +76,11 @@ import {
   smoothToolActive,
   toolRequiresActiveSketch,
 } from './tools/helpers';
-import { applyViewportNavigation, SKETCH_VIEWPORT_NAV_HINT } from './input/viewport-navigation';
+import {
+  applyViewportNavigation,
+  getSketchViewportNavHint,
+  syncOrbitControlsFromCamera,
+} from './input/viewport-navigation';
 import { syncToolButtonHighlight, updateSketchRibbonState } from './sketch-mode/ribbon-state';
 import { createSketchDimensionApi, type SketchDimensionApi } from './sketch-mode/dimensions';
 import { bindFusionKeyboard, renderFusionShortcutsPanel } from './input/fusion-keyboard';
@@ -93,6 +102,7 @@ import {
   DEFAULT_BODY_ID,
   DEFAULT_COMPONENT_ID,
   type BodyTransform,
+  type CadBodyRecord,
 } from './cad-scene';
 import {
   contourInWorldSpace,
@@ -135,19 +145,70 @@ import {
   makeSketchOriginMarker,
   originPlaneAxisFromObject,
   originPlaneSize,
+  sketchGridExtent,
   parseOriginPlaneName,
   sketchLabelForAxis,
   viewPresetForSketchAxis,
   type Sketch,
 } from './sketch';
 import type { SketchDimension, SketchDimensionKind, SketchUnit } from './sketch-dimension';
+import { appendFeature, bindFeatureTimeline } from './feature-timeline';
+import {
+  buildMeshArchive,
+  emptyStlBuffer,
+  stlHasTriangles,
+  syncSceneFromProjectMeta,
+} from './project-io';
+import type { FeatureKind } from './feature-timeline';
 import { bindHistoryTimeline } from './history-timeline';
 import { UndoHistory, captureSnapshot } from './undo';
+import { bindSolidFeatureButtons } from './solid-features';
+import {
+  beginSubtract,
+  cancelSubtract,
+  handleSubtractBodyPick,
+  isSubtractPicking,
+} from './solid-subtract';
+import {
+  cancelAllSolidCommands,
+  handleSolidCommandPointerCancel,
+  handleSolidCommandPointerDown,
+  handleSolidCommandPointerMove,
+  handleSolidCommandPointerUp,
+  isSolidCommandActive,
+  type SolidCommandHosts,
+} from './solid-command';
+import { createExtrudeGizmo } from './solid-extrude-gizmo';
+import { beginExtrude, buildExtrudeLoftPayload, type ExtrudeHost } from './solid-extrude';
+import {
+  beginLoft,
+  buildLoftContoursPayload,
+  isLoftActive,
+  tryCommitLoft,
+  type LoftHost,
+} from './solid-loft';
+import { beginRevolve, buildRevolvePayload, type RevolveHost } from './solid-revolve';
+import {
+  contourLoftPayload,
+  parseMirrorAxis,
+  parsePromptFloat,
+  parsePromptInt,
+} from './solid-ops';
+import {
+  toolAllowedInWorkspace,
+  workspaceForTab,
+  workspaceHintForTool,
+  type WorkspaceMode,
+} from './workspace-mode';
 import {
   bakeMeshGroupTransform,
   clipGeometryByPlane,
   commitBodyGeometry,
   displaceRegion,
+  geometryMeshData,
+  booleanSubtractBodies,
+  booleanUnionBodies,
+  mergeBodyGeometries,
   mirrorGeometry,
   replaceBodyGeometry,
   invalidateMeshAdjacency,
@@ -166,6 +227,7 @@ import { ViewCube, type ViewCubePreset } from './view-cube';
 import {
   SCAN_THEMES,
   SOLID_BODY_STRIDE_MAX,
+  makeScanSolidMaterial,
   applyHeightColors,
   applyNormalColors,
   brightenColor,
@@ -180,22 +242,28 @@ const dom = queryDomRefs();
 initStatusElement(dom.status);
 
 const viewport = dom.viewport;
-const appMenu = new AppMenu(viewport, {
-  align: {
-    onOpen: () => {
-      hitPlaneFeedback = true;
-      (document.getElementById('hit-plane') as HTMLInputElement).checked = true;
-      if (tool === 'align') transformControls.detach();
-      refreshWorkPlaneMesh(getPlaneHitVisual());
-      updateHitFeedback();
-      setStatus('Ebene ausrichten — Position setzen, dann Auto-Ausrichten');
-    },
-    onClose: () => {
-      setPlaneDragMode(false);
-      updateTransformGizmo();
+let handleTabWorkspaceSwitch: ((tab: FusionTab) => void) | null = null;
+
+const appMenu = new AppMenu(
+  viewport,
+  {
+    align: {
+      onOpen: () => {
+        hitPlaneFeedback = true;
+        (document.getElementById('hit-plane') as HTMLInputElement).checked = true;
+        if (tool === 'align') transformControls.detach();
+        refreshWorkPlaneMesh(getPlaneHitVisual());
+        updateHitFeedback();
+        setStatus(t('status.alignPanelOpen'));
+      },
+      onClose: () => {
+        setPlaneDragMode(false);
+        updateTransformGizmo();
+      },
     },
   },
-});
+  (tab) => handleTabWorkspaceSwitch?.(tab),
+);
 const toolHint = dom.toolHint;
 const viewportMenu = dom.viewportMenu;
 const pointMenu = dom.pointMenu;
@@ -258,7 +326,7 @@ const browserPanel = new BrowserPanel(document.getElementById('browser-tree')!, 
   onContextMenu: (target, event) => showBrowserContextMenu(target, event),
   onClearContours: () => clearAllContours(),
   onClearForm: () => clearForm(),
-  onBuildForm: () => void buildLoft(),
+  onBuildForm: () => startSolidCommand('loft', { negativform: true }),
 });
 const planeAxisSel = dom.planeAxisSel;
 const planePos = dom.planePos;
@@ -266,7 +334,8 @@ const planePosVal = dom.planePosVal;
 const scanFile = dom.scanFile;
 const projectFile = dom.projectFile;
 
-let tool: Tool = 'navigate';
+let workspaceMode: WorkspaceMode = 'sketch';
+let tool: Tool = 'sketch-pick';
 let planeAxis: PlaneAxis = 'xy';
 let planePosition = 0;
 let contours: Contour[] = [];
@@ -297,7 +366,7 @@ const lineResolution = new THREE.Vector2(1, 1);
 let lassoScreen: { x: number; y: number }[] = [];
 let isDrawing = false;
 let bodyDisplayMode: ScanDisplayMode = 'cad';
-let bodyBrightness = 1.3;
+let bodyBrightness = 1;
 let hitPointFeedback = true;
 let hitPlaneFeedback = true;
 let planeHitMarkers: THREE.Points | null = null;
@@ -306,15 +375,26 @@ let draggingPlane = false;
 let planeDragStartPos = 0;
 const planeDragStartHit = new THREE.Vector3();
 const undoHistory = new UndoHistory();
-const historyTimeline = bindHistoryTimeline(document.getElementById('fusion-timeline')!, {
+const fusionTimelineEl = document.getElementById('fusion-timeline')!;
+const historyTimeline = bindHistoryTimeline(fusionTimelineEl, {
   onUndo: () => performUndo(),
   onRedo: () => performRedo(),
   onJumpTo: (position) => jumpToHistory(position),
   getView: () => undoHistory.getTimeline(),
 });
+const featureTimeline = bindFeatureTimeline(fusionTimelineEl);
 
 function refreshHistoryTimeline() {
   historyTimeline.refresh();
+}
+
+function refreshFeatureTimeline() {
+  featureTimeline.refresh();
+}
+
+function recordSolidFeature(kind: FeatureKind, label: string, bodyId?: string) {
+  appendFeature({ kind, label, bodyId });
+  refreshFeatureTimeline();
 }
 let transformUndoPushed = false;
 let strokeUndoPushed = false;
@@ -344,7 +424,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.localClippingEnabled = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.3;
+renderer.toneMappingExposure = SCAN_THEMES.cad.toneExposure;
 renderer.domElement.style.touchAction = 'none';
 viewport.appendChild(renderer.domElement);
 
@@ -362,26 +442,46 @@ const viewCube = new ViewCube(
     applyPlaneForPreset(preset);
     controls.target.copy(cadScene.bounds.getCenter(new THREE.Vector3()));
     updateHitFeedback();
-    setStatus(`Ansicht: ${preset}`);
+    setStatus(t('status.viewPreset', { preset: viewPresetStatusLabel(preset) }));
   },
   {
     getPivot: () => controls.target,
+    onOrbitStart: () => syncOrbitControls(),
     onOrbitChange: () => {
+      syncOrbitControlsFromCamera(controls, camera);
       updateHitFeedback();
       sketchDims?.updateScreenScales();
+    },
+    onOrbitEnd: () => {
+      syncOrbitControlsFromCamera(controls, camera);
+      syncOrbitControls();
+      updateHitFeedback();
+    },
+    onFlightEnd: () => {
+      syncOrbitControlsFromCamera(controls, camera);
+      syncOrbitControls();
     },
   },
 );
 
-const ambient = new THREE.AmbientLight(0xffffff, 0.85);
-const hemi = new THREE.HemisphereLight(0xffffff, 0xb0b8c8, 0.7);
-const dir = new THREE.DirectionalLight(0xffffff, 1.1);
-dir.position.set(2, 4, 3);
-const fill = new THREE.DirectionalLight(0xfff4e8, 0.55);
-fill.position.set(-3, 1, -2);
+const ambient = new THREE.AmbientLight(0xffffff, SCAN_THEMES.cad.ambient);
+const hemi = new THREE.HemisphereLight(
+  SCAN_THEMES.cad.hemiSky,
+  SCAN_THEMES.cad.hemiGround,
+  SCAN_THEMES.cad.hemiIntensity,
+);
+const dir = new THREE.DirectionalLight(0xffffff, SCAN_THEMES.cad.dirIntensity);
+dir.position.set(3, 5, 4);
+const fill = new THREE.DirectionalLight(0xe8ecf0, SCAN_THEMES.cad.fillIntensity);
+fill.position.set(-4, 2, -3);
 scene.add(ambient, hemi, dir, fill);
 
-const grid = new THREE.GridHelper(200, 20, 0x98a2b8, 0xb8c0d0);
+const grid = new THREE.GridHelper(
+  200,
+  20,
+  SCAN_THEMES.cad.grid[0],
+  SCAN_THEMES.cad.grid[1],
+);
 scene.add(grid);
 
 const axes = new THREE.AxesHelper(30);
@@ -407,6 +507,14 @@ function captureBodyMeshBuffers(): Record<string, ArrayBuffer> {
   return map;
 }
 
+function captureBodyKinds(): Record<string, BodyKind> {
+  const map: Record<string, BodyKind> = {};
+  for (const body of cadScene.listBodies()) {
+    map[body.id] = body.bodyKind;
+  }
+  return map;
+}
+
 function pushMeshUndo(label = 'Körper bearbeiten') {
   undoHistory.push(
     captureSnapshot(
@@ -415,6 +523,7 @@ function pushMeshUndo(label = 'Körper bearbeiten') {
       ac().alignment,
       captureBodyTransforms(),
       captureBodyMeshBuffers(),
+      captureBodyKinds(),
       sketches,
       activeSketchId,
       sketchDimensions,
@@ -446,13 +555,25 @@ function isDefaultTransform(t: BodyTransform): boolean {
 
 function selectBody(bodyId: string) {
   const body = cadScene.getBody(bodyId);
-  if (!body?.meshGroup.children.length) return;
+  if (!body || !bodyHasContent(body)) return;
+  if (
+    handleSubtractBodyPick(bodyId, {
+      setStatus,
+      getBody: (id) => cadScene.getBody(id),
+      runSubtract: runBooleanSubtract,
+    })
+  ) {
+    refreshBrowserPanel();
+    return;
+  }
   cadScene.setActiveBody(bodyId);
+  appMenu.selectTab('body', false);
+  setWorkspaceMode('body', { tool: bodyGizmoTool(tool) ? tool : 'navigate' });
   updateTransformGizmo();
   applyScanTheme(bodyDisplayMode, bodyBrightness);
   refreshBrowserPanel();
   if (bodyGizmoTool(tool)) {
-    setStatus(`Körper „${body.label}“ — Gizmo zum ${tool === 'scale-body' ? 'Skalieren' : 'Verschieben/Drehen'}`);
+    setStatus(t('status.bodyGizmo', { label: body.label, mode: tool === 'scale-body' ? t('status.bodyGizmoScale') : t('status.bodyGizmoMove') }));
   }
 }
 
@@ -469,6 +590,44 @@ async function rebuildBodyFromMeshBuffer(body: ReturnType<CadScene['getBody']>) 
   if (!body?.meshBuffer) return;
   const mesh = parse_stl_with_stride(new Uint8Array(body.meshBuffer), body.displayStride);
   body.meshGroup.clear();
+  const built = buildScanMesh(body, mesh.positions, mesh.indices);
+  body.meshGroup.add(built);
+  disposeSolidBodyGeom(body.id);
+  if (isTraceAssistOn(body.id)) applyTraceAssistForBody(body.id);
+}
+
+function clearBodyMeshState(body: CadBodyRecord) {
+  disposeSolidBodyGeom(body.id);
+  disposeFestkoerperMesh(body);
+  body.meshGroup.traverse((node) => {
+    if (node instanceof THREE.Mesh || node instanceof THREE.LineSegments || node instanceof THREE.Points) {
+      node.geometry.dispose();
+      const mat = node.material;
+      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+      else mat.dispose();
+    }
+  });
+  body.meshGroup.clear();
+  body.geometry?.dispose();
+  body.geometry = null;
+  body.meshBuffer = null;
+}
+
+async function restoreBodyMesh(
+  body: CadBodyRecord,
+  stlBuf: ArrayBuffer,
+  label: string,
+  stride: number,
+  bodyKind: BodyKind,
+) {
+  clearBodyMeshState(body);
+  body.label = label;
+  body.displayStride = stride;
+  assignBodyKind(body, bodyKind);
+  if (!stlHasTriangles(stlBuf)) return;
+
+  body.meshBuffer = stlBuf.slice(0);
+  const mesh = parse_stl_with_stride(new Uint8Array(stlBuf), stride);
   const built = buildScanMesh(body, mesh.positions, mesh.indices);
   body.meshGroup.add(built);
   disposeSolidBodyGeom(body.id);
@@ -568,9 +727,7 @@ function beginSmoothPaint(pick: SurfacePick, resetSection = false) {
       smoothPaint.sectionOrigin = localCenter.clone();
       smoothPaint.sectionNormal = localNormal.clone();
       updateSectionBandHelper(body, localCenter, localNormal);
-      setStatus(
-        `Sektion ${smoothSectionDepthMm} mm — Band gesetzt · gedrückt halten & über die Zacken fahren`,
-      );
+      setStatus(t('status.smoothSection', { depth: smoothSectionDepthMm }));
     }
   } else {
     clearSectionBandHelper();
@@ -589,8 +746,8 @@ function endSmoothPaint() {
     updateWorldScanBounds();
     setStatus(
       tool === 'smooth-section'
-        ? `Sektion geglättet — „${body.label}“`
-        : `Übergang geglättet — „${body.label}“`,
+        ? t('status.sectionDone', { label: body.label })
+        : t('status.smoothDone', { label: body.label }),
     );
   });
 }
@@ -635,36 +792,49 @@ async function bakeActiveBodyTransform(recordUndo = true) {
   cadScene.updateWorldMatrix();
   updateWorldScanBounds();
   updateHitFeedback();
-  setStatus(`Körper „${body.label}“ — Transformation ins Mesh eingebacken`);
+  setStatus(t('status.bodyBaked', { label: body.label }));
+}
+
+async function duplicateBodyFrom(
+  src: CadBodyRecord,
+  label: string,
+  transform: BodyTransform,
+  recordUndo: boolean,
+): Promise<CadBodyRecord | null> {
+  if (!src.meshBuffer || !src.geometry) return null;
+  if (recordUndo) pushMeshUndo();
+  const bodyId = cadScene.nextBodyId(ac().id);
+  const body = cadScene.createBody(ac().id, bodyId, label);
+  assignBodyKind(body, src.bodyKind);
+  body.meshBuffer = src.meshBuffer.slice(0);
+  body.displayStride = src.displayStride;
+  body.transform = { ...transform };
+  applyAlignment(body.meshGroup, body.transform);
+  const mesh = parse_stl_with_stride(new Uint8Array(body.meshBuffer), body.displayStride);
+  const built = buildScanMesh(body, mesh.positions, mesh.indices);
+  body.meshGroup.add(built);
+  return body;
 }
 
 async function duplicateActiveBody() {
   const src = ab();
   if (!src.meshBuffer || !src.geometry) {
-    setStatus('Kein Mesh zum Duplizieren');
+    setStatus(t('status.noMeshDuplicate'));
     return;
   }
-  pushMeshUndo();
-  const bodyId = cadScene.nextBodyId(ac().id);
   const label = `${src.label} Kopie`;
-  const body = cadScene.createBody(ac().id, bodyId, label);
-  body.meshBuffer = src.meshBuffer.slice(0);
-  body.displayStride = src.displayStride;
-  body.transform = { ...src.transform };
-  applyAlignment(body.meshGroup, body.transform);
-  const mesh = parse_stl_with_stride(new Uint8Array(body.meshBuffer), body.displayStride);
-  const built = buildScanMesh(body, mesh.positions, mesh.indices);
-  body.meshGroup.add(built);
-  cadScene.setActiveBody(bodyId);
+  const body = await duplicateBodyFrom(src, label, { ...src.transform }, true);
+  if (!body) return;
+  cadScene.setActiveBody(body.id);
   updateTransformGizmo();
   refreshBrowserPanel();
-  setStatus(`Körper dupliziert — „${label}“`);
+  setStatus(t('status.bodyDuplicated', { label }));
 }
 
 async function mirrorActiveBody(axis: 'x' | 'y' | 'z' = 'x') {
   const body = ab();
   if (!body.geometry) {
-    setStatus('Kein Mesh zum Spiegeln');
+    setStatus(t('status.noMeshMirror'));
     return;
   }
   pushMeshUndo();
@@ -674,7 +844,8 @@ async function mirrorActiveBody(axis: 'x' | 'y' | 'z' = 'x') {
   refreshBodyMeshVisuals(body);
   updateWorldScanBounds();
   refreshBrowserPanel();
-  setStatus(`Körper „${body.label}“ an ${axis.toUpperCase()}-Achse gespiegelt`);
+  recordSolidFeature('mirror', `${body.label} (${axis.toUpperCase()})`, body.id);
+  setStatus(t('status.bodyMirrored', { label: body.label, axis: axis.toUpperCase() }));
 }
 
 function deleteBodyById(bodyId: string) {
@@ -682,7 +853,7 @@ function deleteBodyById(bodyId: string) {
   if (!body) return;
   const compId = body.componentId;
   if (cadScene.listBodies(compId).length <= 1) {
-    setStatus('Letzter Körper kann nicht gelöscht werden');
+    setStatus(t('status.cannotDeleteLastBody'));
     return;
   }
   pushMeshUndo();
@@ -702,7 +873,7 @@ function deleteBodyById(bodyId: string) {
   cadScene.removeBody(bodyId);
   updateTransformGizmo();
   refreshBrowserPanel();
-  setStatus(`Körper „${label}“ gelöscht`);
+  setStatus(t('status.bodyDeleted', { label }));
 }
 
 function deleteActiveBody() {
@@ -712,21 +883,21 @@ function deleteActiveBody() {
 function renameBody(bodyId: string) {
   const body = cadScene.getBody(bodyId);
   if (!body) return;
-  const next = window.prompt('Körpername:', body.label);
+  const next = window.prompt(t('browser.prompt.bodyName'), body.label);
   if (!next?.trim()) return;
   body.label = next.trim();
   refreshBrowserPanel();
-  setStatus(`Körper umbenannt — „${body.label}“`);
+  setStatus(t('status.bodyRenamed', { label: body.label }));
 }
 
 function renameComponent(compId: string) {
   const comp = cadScene.getComponent(compId);
   if (!comp) return;
-  const next = window.prompt('Komponentenname:', comp.label);
+  const next = window.prompt(t('browser.prompt.componentName'), comp.label);
   if (!next?.trim()) return;
   comp.label = next.trim();
   refreshBrowserPanel();
-  setStatus(`Komponente umbenannt — „${comp.label}“`);
+  setStatus(t('status.componentRenamed', { label: comp.label }));
 }
 
 function resetComponentAlignment(compId: string) {
@@ -737,7 +908,7 @@ function resetComponentAlignment(compId: string) {
   applyAlignment(comp.group, comp.alignment);
   if (compId === ac().id) onBodyTransformChanged();
   refreshBrowserPanel();
-  setStatus(`Ausrichtung von „${comp.label}“ zurückgesetzt`);
+  setStatus(t('status.alignmentReset', { label: comp.label }));
 }
 
 let browserCtxTarget: BrowserContextTarget | null = null;
@@ -755,17 +926,17 @@ function buildBrowserContextMenu(target: BrowserContextTarget) {
     browserCtxTitle.textContent = body.label;
     const traceOn = isTraceAssistOn(target.id);
     browserCtxActions.innerHTML = [
-      `<button type="button" data-browser-ctx="rename">✎ Umbenennen</button>`,
-      `<button type="button" data-browser-ctx="color">🎨 Farbe ändern</button>`,
-      `<div class="vm-section">Aktionen</div>`,
-      `<button type="button" data-browser-ctx="select">◉ Aktivieren</button>`,
-      `<button type="button" data-browser-ctx="toggle-vis">${body.visible ? '○ Ausblenden' : '◉ Einblenden'}</button>`,
-      `<button type="button" data-browser-ctx="toggle-trace">${traceOn ? 'Nachzeichnen aus' : 'Nachzeichnen ein'}</button>`,
-      `<button type="button" data-browser-ctx="move">✥ Frei bewegen</button>`,
-      `<button type="button" data-browser-ctx="smooth">▥ Sektion glätten</button>`,
-      `<button type="button" data-browser-ctx="duplicate">⧉ Duplizieren</button>`,
-      `<button type="button" data-browser-ctx="reset-transform">⊙ Lage zurücksetzen</button>`,
-      `<button type="button" data-browser-ctx="delete" class="ctx-danger" ${compBodies.length <= 1 ? 'disabled' : ''}>× Löschen</button>`,
+      `<button type="button" data-browser-ctx="rename">${t('browser.ctx.rename')}</button>`,
+      `<button type="button" data-browser-ctx="color">${t('browser.ctx.color')}</button>`,
+      `<div class="vm-section">${t('browser.ctx.actions')}</div>`,
+      `<button type="button" data-browser-ctx="select">${t('browser.ctx.select')}</button>`,
+      `<button type="button" data-browser-ctx="toggle-vis">${body.visible ? t('browser.ctx.hide') : t('browser.ctx.show')}</button>`,
+      `<button type="button" data-browser-ctx="toggle-trace">${traceOn ? t('browser.ctx.traceOff') : t('browser.ctx.traceOn')}</button>`,
+      `<button type="button" data-browser-ctx="move">${t('browser.ctx.move')}</button>`,
+      `<button type="button" data-browser-ctx="smooth">${t('browser.ctx.smooth')}</button>`,
+      `<button type="button" data-browser-ctx="duplicate">${t('browser.ctx.duplicate')}</button>`,
+      `<button type="button" data-browser-ctx="reset-transform">${t('browser.ctx.resetTransform')}</button>`,
+      `<button type="button" data-browser-ctx="delete" class="ctx-danger" ${compBodies.length <= 1 ? 'disabled' : ''}>${t('browser.ctx.delete')}</button>`,
     ].join('');
     return;
   }
@@ -774,11 +945,11 @@ function buildBrowserContextMenu(target: BrowserContextTarget) {
   if (!comp) return;
   browserCtxTitle.textContent = comp.label;
   browserCtxActions.innerHTML = [
-    `<button type="button" data-browser-ctx="rename">✎ Umbenennen</button>`,
-    `<div class="vm-section">Aktionen</div>`,
-    `<button type="button" data-browser-ctx="activate">◉ Aktivieren</button>`,
-    `<button type="button" data-browser-ctx="toggle-vis">${comp.visible ? '○ Ausblenden' : '◉ Einblenden'}</button>`,
-    `<button type="button" data-browser-ctx="align-reset">⟳ Ausrichtung zurücksetzen</button>`,
+    `<button type="button" data-browser-ctx="rename">${t('browser.ctx.rename')}</button>`,
+    `<div class="vm-section">${t('browser.ctx.actions')}</div>`,
+    `<button type="button" data-browser-ctx="activate">${t('browser.ctx.activate')}</button>`,
+    `<button type="button" data-browser-ctx="toggle-vis">${comp.visible ? t('browser.ctx.hide') : t('browser.ctx.show')}</button>`,
+    `<button type="button" data-browser-ctx="align-reset">${t('browser.ctx.alignReset')}</button>`,
   ].join('');
 }
 
@@ -862,7 +1033,7 @@ function applyBrowserContextAction(action: string) {
     case 'activate':
       cadScene.setActiveComponent(compId);
       refreshBrowserPanel();
-      setStatus(`Komponente „${cadScene.getComponent(compId)?.label ?? compId}“ aktiv`);
+      setStatus(t('status.componentActive', { label: cadScene.getComponent(compId)?.label ?? compId }));
       return;
     case 'toggle-vis':
       toggleBrowserItem(`component:${compId}`);
@@ -895,10 +1066,43 @@ function showBodyColorMenuInBrowser(bodyId: string, anchor?: DOMRect) {
   bodyColorMenu.style.top = `${top}px`;
 }
 
+async function runBooleanSubtract(toolId: string, targetId: string) {
+  const tool = cadScene.getBody(toolId);
+  const target = cadScene.getBody(targetId);
+  if (!tool?.geometry || !target?.geometry) {
+    setStatus(t('status.subtractFailed'));
+    return;
+  }
+
+  pushMeshUndo(t('undo.subtract'));
+  const result = await booleanSubtractBodies(target, tool);
+  if (!result) {
+    setStatus(t('status.subtractFailed'));
+    return;
+  }
+
+  replaceBodyGeometry(target, result);
+  await commitBodyGeometry(target);
+  target.meshGroup.clear();
+  const mesh = parse_stl_with_stride(new Uint8Array(target.meshBuffer!), target.displayStride);
+  const built = buildScanMesh(target, mesh.positions, mesh.indices);
+  target.meshGroup.add(built);
+  disposeSolidBodyGeom(target.id);
+  if (isTraceAssistOn(target.id)) applyTraceAssistForBody(target.id);
+  refreshBodyMeshVisuals(target);
+  cadScene.setActiveBody(targetId);
+  cadScene.updateWorldMatrix();
+  updateWorldScanBounds();
+  updateHitFeedback();
+  refreshBrowserPanel();
+  recordSolidFeature('subtract', target.label, targetId);
+  setStatus(t('status.subtractDone', { label: target.label }));
+}
+
 async function cutBodyByWorkPlane() {
   const body = ab();
   if (!body.geometry) {
-    setStatus('Kein Mesh zum Schneiden');
+    setStatus(t('status.noMeshCut'));
     return;
   }
   pushMeshUndo();
@@ -910,14 +1114,15 @@ async function cutBodyByWorkPlane() {
   const localPlane = plane.clone().applyMatrix4(body.meshGroup.matrixWorld.clone().invert());
   const clipped = clipGeometryByPlane(body.geometry, localPlane);
   if (!clipped) {
-    setStatus('Schnitt leer — Ebene liegt außerhalb des Körpers');
+    setStatus(t('status.cutEmpty'));
     return;
   }
   replaceBodyGeometry(body, clipped);
   await commitBodyGeometry(body);
   refreshBodyMeshVisuals(body);
   updateWorldScanBounds();
-  setStatus(`Körper „${body.label}“ an Arbeitsebene geschnitten`);
+  recordSolidFeature('split-body', body.label, body.id);
+  setStatus(t('status.bodyCut', { label: body.label }));
 }
 
 function contourWorldMatrix(c: Contour): THREE.Matrix4 {
@@ -1002,6 +1207,11 @@ scene.add(drawGroup);
 const formGroup = new THREE.Group();
 formGroup.name = 'form';
 scene.add(formGroup);
+
+const extrudeGizmoGroup = new THREE.Group();
+extrudeGizmoGroup.name = 'extrude-gizmo';
+scene.add(extrudeGizmoGroup);
+const extrudeGizmo = createExtrudeGizmo(extrudeGizmoGroup, () => cadScene.size);
 
 const hitGroup = new THREE.Group();
 hitGroup.name = 'hit-feedback';
@@ -1149,10 +1359,10 @@ function setPlaneDragMode(on: boolean) {
     (document.getElementById('hit-plane') as HTMLInputElement).checked = true;
     transformControls.detach();
     if (!appMenu.isOpen('align')) appMenu.openAlignPanel();
-    toolHint.textContent = 'Ebene ziehen: Im 3D-Fenster auf der Ebene klicken und ziehen';
-    setStatus('Ebene ziehen aktiv — Position der Arbeitsebene im 3D-Fenster setzen');
+    toolHint.textContent = t('toolHint.planeDrag');
+    setStatus(t('status.planeDragActive'));
   } else {
-    toolHint.textContent = TOOL_HINTS[tool];
+    refreshToolHint();
     updateTransformGizmo();
   }
   refreshWorkPlaneMesh(getPlaneHitVisual());
@@ -1188,12 +1398,22 @@ function applyAutoAlignResult(result: NonNullable<ReturnType<typeof computeAlign
   const converged = remainder.rotDeg < 1.5 && remainder.pos < tol;
   if (converged) {
     setStatus(
-      `Körper an Ebene ausgerichtet — ${hits.hitCount.toLocaleString()} Punkte treffen (${(hits.hitRatio * 100).toFixed(0)} %)`,
+      t('status.autoAlignDone', {
+        count: hits.hitCount.toLocaleString(),
+        percent: (hits.hitRatio * 100).toFixed(0),
+      }),
     );
   } else {
     const { rotX, rotY, rotZ } = ac().alignment;
     setStatus(
-      `Schrittweise angenähert — ${hits.hitCount.toLocaleString()} Treffer (${(hits.hitRatio * 100).toFixed(0)} %) · Winkel ${rotX.toFixed(1)}°/${rotY.toFixed(1)}°/${rotZ.toFixed(1)}° · noch ~${remainder.rotDeg.toFixed(0)}° — erneut klicken`,
+      t('status.autoAlignStep', {
+        count: hits.hitCount.toLocaleString(),
+        percent: (hits.hitRatio * 100).toFixed(0),
+        rotX: rotX.toFixed(1),
+        rotY: rotY.toFixed(1),
+        rotZ: rotZ.toFixed(1),
+        remainder: remainder.rotDeg.toFixed(0),
+      }),
     );
   }
 }
@@ -1201,7 +1421,7 @@ function applyAutoAlignResult(result: NonNullable<ReturnType<typeof computeAlign
 function autoAlignScanToPlane() {
   if (alignBusy) return;
   if (!ab().geometry) {
-    setStatus('Kein Körper geladen');
+    setStatus(t('status.noBodyLoaded'));
     return;
   }
   pushUndo('Auto-Ausrichten');
@@ -1209,7 +1429,7 @@ function autoAlignScanToPlane() {
   const alignBtn = document.getElementById('align-to-plane') as HTMLButtonElement | null;
   alignBusy = true;
   if (alignBtn) alignBtn.disabled = true;
-  setStatus('Auto-Ausrichtung berechnet…');
+  setStatus(t('status.autoAlignComputing'));
 
   requestAnimationFrame(() => {
     try {
@@ -1221,7 +1441,7 @@ function autoAlignScanToPlane() {
         ac().alignment,
       );
       if (!result) {
-        setStatus('Auto-Ausrichtung fehlgeschlagen — Körper zu klein?');
+        setStatus(t('status.autoAlignFailed'));
         return;
       }
       applyAutoAlignResult(result);
@@ -1233,8 +1453,115 @@ function autoAlignScanToPlane() {
 }
 
 function isEmptyProject(): boolean {
-  return ab().meshGroup.children.length === 0;
+  return cadScene.listBodies().every((b) => b.meshGroup.children.length === 0);
 }
+
+function bodyHasContent(body: ReturnType<CadScene['getBody']>): boolean {
+  return !!body && (body.meshGroup.children.length > 0 || !!body.meshBuffer);
+}
+
+function closeActiveSketch() {
+  discardIncompleteDraft(true);
+  clearSketchInteraction();
+  sketchDims.clearSession();
+  setSketchOriginSnapFeedback(false);
+  activeSketchId = null;
+  hoveredOriginPlane = null;
+  updateOriginPlaneHighlight(null);
+  updateSketchGrid();
+  sketchDims.rebuild();
+  sketchDims.refreshList();
+  updateSketchRibbonState(null, 'sketch-pick');
+}
+
+
+function viewPresetStatusLabel(preset: string): string {
+  const keyMap: Record<string, string> = {
+    top: 'view.top',
+    bottom: 'view.bottom',
+    front: 'view.front',
+    back: 'view.back',
+    side: 'view.side',
+    right: 'view.side',
+    left: 'view.left',
+    perspective: 'view.perspective',
+  };
+  const key = keyMap[preset];
+  return key ? t(key) : preset;
+}
+
+function refreshToolHint() {
+  const navHint =
+    activeSketchId || tool === 'sketch-pick' || tool.startsWith('sketch-')
+      ? ` · ${getSketchViewportNavHint()}`
+      : '';
+  toolHint.textContent = getToolHint(tool) + navHint;
+}
+
+function syncWorkspaceChrome() {
+  const app = document.getElementById('app');
+  app?.classList.toggle('workspace-sketch', workspaceMode === 'sketch');
+  app?.classList.toggle('workspace-body', workspaceMode === 'body');
+  app?.classList.toggle('workspace-contour', workspaceMode === 'contour');
+  const labelKey: 'workspace.sketch' | 'workspace.body' | 'workspace.contour' =
+    workspaceMode === 'sketch'
+      ? 'workspace.sketch'
+      : workspaceMode === 'body'
+        ? 'workspace.body'
+        : 'workspace.contour';
+  setWorkspaceModeLabel(labelKey);
+}
+
+function syncWorkspaceScene() {
+  if (workspaceMode === 'sketch') {
+    if (!activeSketchId) {
+      originPlanesGroup.visible = browserState.originPlanesVisible;
+      if (isEmptyProject()) setupEmptyProjectView();
+    } else {
+      originPlanesGroup.visible = false;
+    }
+    return;
+  }
+
+  originPlanesGroup.visible = false;
+  hoveredOriginPlane = null;
+  updateOriginPlaneHighlight(null);
+  if (!isEmptyProject()) {
+    browserState.planeVisible = true;
+    refreshWorkPlaneMesh(getPlaneHitVisual());
+  }
+}
+
+function setWorkspaceMode(mode: WorkspaceMode, opts?: { tool?: Tool; keepSketch?: boolean }) {
+  if (mode === workspaceMode && !opts?.tool && (mode === 'sketch' || !activeSketchId)) {
+    syncWorkspaceChrome();
+    return;
+  }
+
+  if (mode !== 'sketch' && activeSketchId && !opts?.keepSketch) {
+    closeActiveSketch();
+  }
+
+  workspaceMode = mode;
+  syncWorkspaceChrome();
+  syncWorkspaceScene();
+
+  if (mode === 'sketch') {
+    transformControls.detach();
+    const next = opts?.tool ?? (activeSketchId ? 'navigate' : 'sketch-pick');
+    setTool(next, { skipWorkspaceCheck: true });
+    return;
+  }
+
+  transformControls.detach();
+  const fallback = toolAllowedInWorkspace(tool, mode, null) ? tool : 'navigate';
+  setTool(opts?.tool ?? fallback, { skipWorkspaceCheck: true });
+}
+
+handleTabWorkspaceSwitch = (tab) => {
+  const ws = workspaceForTab(tab);
+  if (ws) setWorkspaceMode(ws);
+};
 
 function setupEmptyProjectView() {
   const origin = new THREE.Vector3(0, 0, 0);
@@ -1277,7 +1604,7 @@ function setupEmptyProjectView() {
 
 function updateWorldScanBounds(fitCamera = false) {
   if (!ab().meshGroup.children.length) {
-    if (!activeSketchId && tool === 'sketch-pick') setupEmptyProjectView();
+    if (!activeSketchId && workspaceMode === 'sketch' && tool === 'sketch-pick') setupEmptyProjectView();
     else initOriginPlanes();
     return;
   }
@@ -1436,14 +1763,14 @@ function beginSketchOnPlane(axis: PlaneAxis, position = 0) {
   updateOriginPlaneHighlight(axis);
   setView(viewPresetForSketchAxis(axis));
   updateSketchGrid();
-  setTool('navigate');
   appMenu.selectTab('sketch', false);
+  setWorkspaceMode('sketch', { tool: 'navigate', keepSketch: true });
   refreshWorkPlaneMesh(getPlaneHitVisual());
   updateHitFeedback();
   sketchDims.refreshList();
   refreshBrowserPanel();
   updateSketchRibbonState(activeSketchId, tool);
-  setStatus(`Skizze auf ${axis.toUpperCase()} — Zeichenwerkzeug wählen (z. B. Linie L)`);
+  setStatus(t('status.sketchOnAxis', { axis: axis.toUpperCase() }));
 }
 
 function activateSketch(sketchId: string) {
@@ -1457,39 +1784,29 @@ function activateSketch(sketchId: string) {
   updateOriginPlaneHighlight(sk.axis);
   setView(viewPresetForSketchAxis(sk.axis));
   updateSketchGrid();
-  setTool('navigate');
   appMenu.selectTab('sketch', false);
+  setWorkspaceMode('sketch', { tool: 'navigate', keepSketch: true });
   refreshWorkPlaneMesh(getPlaneHitVisual());
   updateHitFeedback();
   sketchDims.refreshList();
   refreshBrowserPanel();
   updateSketchRibbonState(activeSketchId, tool);
-  setStatus(`${sk.label} — Zeichenwerkzeug wählen · Bogen/Dreieck = 3 Klicks`);
+  setStatus(t('status.sketchActive', { label: sk.label }));
 }
 
 function finishSketch() {
-  discardIncompleteDraft(true);
-  clearSketchInteraction();
-  sketchDims.clearSession();
-  setSketchOriginSnapFeedback(false);
-  activeSketchId = null;
-  hoveredOriginPlane = null;
-  if (isEmptyProject()) setupEmptyProjectView();
-  updateOriginPlaneHighlight(null);
-  updateSketchGrid();
-  sketchDims.rebuild();
-  sketchDims.refreshList();
-  setTool('sketch-pick');
+  closeActiveSketch();
+  appMenu.selectTab('start', false);
+  setWorkspaceMode('body', { tool: 'navigate' });
   refreshBrowserPanel();
-  updateSketchRibbonState(null, 'sketch-pick');
-  setStatus('Skizze beendet — XY / XZ / YZ im 3D-Fenster anklicken');
+  setStatus(t('status.sketchFinished'));
 }
 
 function enterSketchPickMode() {
   if (activeSketchId) return;
-  setTool('sketch-pick');
-  if (isEmptyProject()) setupEmptyProjectView();
-  setStatus('Neue Skizze — XY / XZ / YZ Ebene im 3D-Fenster anklicken');
+  appMenu.selectTab('sketch', false);
+  setWorkspaceMode('sketch', { tool: 'sketch-pick' });
+  setStatus(t('status.newSketch'));
 }
 
 function disposeSketchGridContents() {
@@ -1527,7 +1844,7 @@ function updateSketchGrid() {
     sketchDims.rebuild();
     return;
   }
-  const extent = originPlaneSize(cadScene.size) * 0.5;
+  const extent = sketchGridExtent(cadScene.size);
   sketchGridGroup.add(makeSketchGrid(sk.axis, sk.position, extent, sketchGridSpacing));
   sketchGridGroup.add(makeSketchOriginMarker(sk.axis, sk.position, sketchGridSpacing));
   sketchGridGroup.visible = true;
@@ -1700,7 +2017,7 @@ function commitSketchPrimitive(points: THREE.Vector3[], closed: boolean, label: 
   line.visible = true;
   drawGroup.add(line);
   refreshContourList();
-  setStatus(`${label} in Skizze gespeichert (${points.length} Punkte)`);
+  setStatus(t('status.primitiveSaved', { label, count: points.length }));
 }
 
 function previewSketchPrimitive(tool: Tool, anchor: THREE.Vector3, cursor: THREE.Vector3) {
@@ -1739,7 +2056,7 @@ function previewSketchClicks(tool: 'sketch-arc' | 'sketch-triangle', points: THR
 
 function finishSketchDrag(tool: 'sketch-line' | 'sketch-circle' | 'sketch-rect', start: THREE.Vector3, end: THREE.Vector3) {
   if (start.distanceTo(end) < 0.5) {
-    setStatus('Zu klein — weiter ziehen oder größeren Radius wählen');
+    setStatus(t('status.tooSmall'));
     return;
   }
   if (tool === 'sketch-line') {
@@ -1756,13 +2073,13 @@ function finishSketchDrag(tool: 'sketch-line' | 'sketch-circle' | 'sketch-rect',
 function handleSketchClickTool(tool: 'sketch-arc' | 'sketch-triangle', hit: THREE.Vector3) {
   if (!sketchInteraction || sketchInteraction.mode !== 'clicks' || sketchInteraction.tool !== tool) {
     sketchInteraction = { mode: 'clicks', tool, points: [hit.clone()] };
-    setStatus(tool === 'sketch-arc' ? 'Bogen: 2. Punkt (Verlauf)' : 'Dreieck: 2. Ecke');
+    setStatus(tool === 'sketch-arc' ? t('status.arcPoint2') : t('status.trianglePoint2'));
     return;
   }
   sketchInteraction.points.push(hit.clone());
   const pts = sketchInteraction.points;
   if (pts.length < 3) {
-    setStatus(tool === 'sketch-arc' ? 'Bogen: 3. Punkt (Ende)' : 'Dreieck: 3. Ecke');
+    setStatus(tool === 'sketch-arc' ? t('status.arcPoint3') : t('status.trianglePoint3'));
     return;
   }
   if (tool === 'sketch-triangle') {
@@ -1777,7 +2094,7 @@ function handleSketchClickTool(tool: 'sketch-arc' | 'sketch-triangle', hit: THRE
 function handleSketchPointerDown(e: PointerEvent) {
   const hit = pickSketchHit(e.clientX, e.clientY);
   if (!hit) {
-    setStatus('Kein Treffer auf Skizze — Ebene im Blickfeld halten');
+    setStatus(t('status.sketchMiss'));
     return;
   }
   if (tool === 'sketch-arc' || tool === 'sketch-triangle') {
@@ -1951,8 +2268,8 @@ function toggleContourAttachById(id: BrowserItemId) {
   refreshBrowserPanel();
   setStatus(
     pinned
-      ? `Kontur geheftet an ${bodyLabelForId(bodyId) ?? 'Körper'} — bewegt sich mit Frei bewegen / Ausrichten`
-      : 'Heftung gelöst — Kontur bleibt in der Welt fixiert',
+      ? t('status.contourPinned', { label: bodyLabelForId(bodyId) ?? t('browser.solidBody') })
+      : t('status.contourUnpinned'),
   );
 }
 
@@ -1993,6 +2310,7 @@ function snapshotNow() {
     ac().alignment,
     captureBodyTransforms(),
     undefined,
+    captureBodyKinds(),
     sketches,
     activeSketchId,
     sketchDimensions,
@@ -2153,7 +2471,7 @@ function clearForm() {
   pushUndo('Negativform löschen');
   formGroup.clear();
   refreshBrowserPanel();
-  setStatus('Negativform gelöscht');
+  setStatus(t('status.formDeleted'));
 }
 
 function toggleBrowserItem(id: BrowserItemId) {
@@ -2198,7 +2516,7 @@ function toggleBrowserItem(id: BrowserItemId) {
           applyAllTraceAssist();
           applyScanTheme(bodyDisplayMode);
         }
-        setStatus(next ? 'Nachzeichnen ein — Scan als Festkörper' : 'Nachzeichnen aus');
+        setStatus(next ? t('status.traceOn') : t('status.traceOff'));
       } else {
         body.visible = !body.visible;
         body.meshGroup.visible = body.visible;
@@ -2271,16 +2589,17 @@ function deleteBrowserItem(id: BrowserItemId) {
       disposeLine2(obj as Line2);
     }
     refreshContourList();
-    setStatus('Kontur gelöscht');
+    setStatus(t('status.contourDeleted'));
     return;
   }
   if (id === 'form') clearForm();
 }
 
 function refreshBrowserPanel() {
+  const activeBody = ab();
   browserPanel.render({
     componentsFolderExpanded: browserState.componentsFolderExpanded,
-    activeBodyId: ab().id,
+    activeBodyId: bodyHasContent(activeBody) ? activeBody.id : '',
     activeSketchId,
     originPlanesVisible: browserState.originPlanesVisible,
     components: cadScene.listComponents().map((comp) => {
@@ -2317,7 +2636,10 @@ function refreshBrowserPanel() {
             })),
           };
         }),
-        bodies: cadScene.listBodies(comp.id).map((b, bodyIndex) => {
+        bodies: cadScene
+          .listBodies(comp.id)
+          .filter((b) => bodyHasContent(b))
+          .map((b, bodyIndex) => {
           const wire = b.meshGroup.getObjectByName('wire') as THREE.LineSegments | undefined;
           const points = b.meshGroup.getObjectByName('points') as THREE.Points | undefined;
           const hasMesh = b.meshGroup.children.length > 0;
@@ -2325,6 +2647,7 @@ function refreshBrowserPanel() {
             id: b.id,
             label: `Körper ${bodyIndex + 1}`,
             meshName: b.label,
+            bodyKind: b.bodyKind,
             hasMesh,
             visible: comp.visible && b.visible && hasMesh,
             wireVisible: comp.visible && b.visible && (wire?.visible ?? false),
@@ -2381,6 +2704,12 @@ function restoreSnapshot(snap: ReturnType<typeof snapshotNow>) {
       void rebuildBodyFromMeshBuffer(body);
     }
   }
+  if (snap.bodyKinds) {
+    for (const [id, kind] of Object.entries(snap.bodyKinds)) {
+      const body = cadScene.getBody(id);
+      if (body) body.bodyKind = kind;
+    }
+  }
   sketches = snap.sketches.map((s) => ({ ...s }));
   sketchDimensions = (snap.sketchDimensions ?? []).map((d) => ({
     ...d,
@@ -2408,27 +2737,27 @@ function restoreSnapshot(snap: ReturnType<typeof snapshotNow>) {
 function performUndo() {
   const prev = undoHistory.takeUndo(snapshotNow());
   if (!prev) {
-    setStatus('Nichts zum Rückgängigmachen');
+    setStatus(t('status.nothingUndo'));
     return;
   }
   restoreSnapshot(prev);
   refreshHistoryTimeline();
   const view = undoHistory.getTimeline();
   const label = view.position > 0 ? view.steps[view.position - 1]?.label : 'Start';
-  setStatus(`Rückgängig → ${label ?? 'Start'} (Strg+Z)`);
+  setStatus(t('status.undoTo', { label: label ?? 'Start' }));
 }
 
 function performRedo() {
   const next = undoHistory.takeRedo(snapshotNow());
   if (!next) {
-    setStatus('Nichts zum Wiederholen');
+    setStatus(t('status.nothingRedo'));
     return;
   }
   restoreSnapshot(next);
   refreshHistoryTimeline();
   const view = undoHistory.getTimeline();
   const label = view.steps[view.position - 1]?.label ?? 'Schritt';
-  setStatus(`Wiederholt → ${label} (Strg+Umschalt+Z)`);
+  setStatus(t('status.redoTo', { label }));
 }
 
 function jumpToHistory(target: number) {
@@ -2448,10 +2777,10 @@ function jumpToHistory(target: number) {
   }
   refreshHistoryTimeline();
   if (target === 0) {
-    setStatus('Verlauf: Ausgangszustand');
+    setStatus(t('status.historyInitial'));
   } else {
     const step = undoHistory.getTimeline().steps[target - 1];
-    setStatus(`Verlauf: ${step?.label ?? `Schritt ${target}`}`);
+    setStatus(t('status.historyStep', { label: step?.label ?? `Schritt ${target}` }));
   }
 }
 
@@ -2490,7 +2819,7 @@ function resetBodyTransform() {
   applyAlignment(ab().meshGroup, ab().transform);
   onBodyTransformChanged();
   updateTransformGizmo();
-  setStatus(`Körper „${ab().label}“ — Lage zurückgesetzt`);
+  setStatus(t('status.bodyTransformReset', { label: ab().label }));
 }
 
 function setTransformMode(mode: 'translate' | 'rotate') {
@@ -2498,7 +2827,7 @@ function setTransformMode(mode: 'translate' | 'rotate') {
   document.querySelectorAll('[data-tmode]').forEach((btn) => {
     btn.classList.toggle('active', (btn as HTMLElement).dataset.tmode === mode);
   });
-  setStatus(mode === 'translate' ? 'Verschieben — Achsen im Viewer ziehen' : 'Drehen — Ringe im Viewer ziehen');
+  setStatus(mode === 'translate' ? t('status.transformTranslate') : t('status.transformRotate'));
 }
 
 function wireEdgesVisible(mode: ScanDisplayMode = bodyDisplayMode): boolean {
@@ -2602,7 +2931,7 @@ function setBodySolidColor(bodyId: string, hex: string, quiet = false) {
   bodySolidColors.set(bodyId, hexColorToNumber(hex));
   refreshFestkoerperMaterial(bodyId);
   syncBodyColorMenuUi(hex);
-  if (!quiet) setStatus(`Festkörper-Farbe: ${hex}`);
+  if (!quiet) setStatus(t('status.solidColor', { hex }));
 }
 
 function refreshFestkoerperMaterial(bodyId: string) {
@@ -2691,12 +3020,12 @@ function applyAllTraceAssist() {
   const solidActive = cadScene.listBodies().some((b) => isTraceAssistOn(b.id) && b.visible && b.geometry);
   const theme = SCAN_THEMES[bodyDisplayMode];
   if (solidActive) {
-    dir.intensity = 1.65;
-    fill.intensity = 0.55;
-    ambient.intensity = 0.72 * bodyBrightness;
+    dir.intensity = 1.65 * bodyBrightness;
+    fill.intensity = 0.42 * bodyBrightness;
+    ambient.intensity = 0.55 * bodyBrightness;
   } else {
-    dir.intensity = 1.1;
-    fill.intensity = 0.55;
+    dir.intensity = theme.dirIntensity * bodyBrightness;
+    fill.intensity = theme.fillIntensity * bodyBrightness;
     ambient.intensity = theme.ambient * bodyBrightness;
   }
 }
@@ -2711,7 +3040,14 @@ function applyScanTheme(mode: ScanDisplayMode, brightness = bodyBrightness) {
   hemi.color.setHex(theme.hemiSky);
   hemi.groundColor.setHex(theme.hemiGround);
   hemi.intensity = theme.hemiIntensity * brightness;
-  renderer.toneMappingExposure = 0.9 + brightness * 0.5;
+  dir.intensity = theme.dirIntensity * brightness;
+  fill.intensity = theme.fillIntensity * brightness;
+  renderer.toneMappingExposure = theme.toneExposure * (0.92 + brightness * 0.12);
+
+  const gridSize =
+    cadScene.size > 1 ? cadScene.size * 2 : EMPTY_PROJECT_VIEW_SIZE * 2;
+  (grid.geometry as THREE.BufferGeometry).dispose();
+  grid.geometry = new THREE.GridHelper(gridSize, 40, theme.grid[0], theme.grid[1]).geometry;
 
   const activeTraceOn = isTraceAssistOn(ab().id);
   const { solid, wire, points } = getBodyMeshParts(ab());
@@ -2734,24 +3070,13 @@ function applyScanTheme(mode: ScanDisplayMode, brightness = bodyBrightness) {
     : theme.solidOpacity;
 
   if (solid && !activeTraceOn) {
-    const mat = theme.shadedSurface
-      ? new THREE.MeshLambertMaterial({
-          color: solidColor,
-          vertexColors: useVertexColors,
-          transparent: true,
-          opacity: Math.max(solidOpacity, theme.solidOpacity * 0.25),
-          side: THREE.DoubleSide,
-          clippingPlanes: clipPlanes,
-          depthWrite: solidOpacity > 0.45,
-        })
-      : new THREE.MeshBasicMaterial({
-          color: solidColor,
-          transparent: true,
-          opacity: solidOpacity,
-          side: THREE.DoubleSide,
-          clippingPlanes: clipPlanes,
-          depthWrite: solidOpacity > 0.5,
-        });
+    const mat = makeScanSolidMaterial(
+      theme,
+      solidColor,
+      Math.max(solidOpacity, theme.solidOpacity * 0.25),
+      useVertexColors,
+      clipPlanes,
+    );
     (solid.material as THREE.Material).dispose();
     solid.material = mat;
     solid.visible = true;
@@ -2759,8 +3084,11 @@ function applyScanTheme(mode: ScanDisplayMode, brightness = bodyBrightness) {
 
   if (wire && !activeTraceOn) {
     const edgeColor = brightenColor(theme.edgeColor, mode === 'dunkel' ? brightness : 1);
-    (wire.material as THREE.LineBasicMaterial).color.setHex(edgeColor);
-    (wire.material as THREE.LineBasicMaterial).opacity = theme.edgeOpacity;
+    const wmat = wire.material as THREE.LineBasicMaterial;
+    wmat.color.setHex(edgeColor);
+    wmat.opacity = theme.edgeOpacity;
+    wmat.transparent = theme.edgeOpacity < 1;
+    wmat.depthTest = true;
     wire.visible = wireEdgesVisible(mode);
     wire.renderOrder = mode === 'flaeche' ? 2 : 0;
   }
@@ -2794,23 +3122,22 @@ function buildScanMesh(
   const theme = SCAN_THEMES[bodyDisplayMode];
   const solidColor = brightenColor(theme.solidColor, bodyBrightness);
 
-  const solidMat = new THREE.MeshBasicMaterial({
-    color: solidColor,
-    transparent: true,
-    opacity: theme.solidOpacity,
-    side: THREE.DoubleSide,
-    clippingPlanes: clipPlanes,
-    clipIntersection: false,
-  });
+  const solidMat = makeScanSolidMaterial(
+    theme,
+    solidColor,
+    theme.solidOpacity,
+    false,
+    clipPlanes,
+  );
 
   const solid = new THREE.Mesh(geom, solidMat);
   solid.name = 'solid';
 
   const wire = new THREE.LineSegments(
-    new THREE.EdgesGeometry(geom, 12),
+    new THREE.EdgesGeometry(geom, theme.edgeThreshold),
     new THREE.LineBasicMaterial({
       color: theme.edgeColor,
-      transparent: true,
+      transparent: theme.edgeOpacity < 1,
       opacity: theme.edgeOpacity,
     }),
   );
@@ -2835,11 +3162,22 @@ function buildScanMesh(
   return group;
 }
 
-async function promoteLoftToNewBody(mesh: {
-  positions: Float32Array;
-  indices: Uint32Array;
-  triangle_count: number;
-}) {
+async function promoteMeshToNewBody(
+  mesh: {
+    positions: Float32Array;
+    indices: Uint32Array;
+    triangle_count: number;
+  },
+  labelPrefix: string,
+  opts?: {
+    tab?: 'solid' | 'body' | 'contours';
+    workspace?: WorkspaceMode;
+    bodyKind?: BodyKind;
+    featureKind?: FeatureKind;
+    afterTool?: Tool;
+    keepSketch?: boolean;
+  },
+) {
   await initWasm();
   const stlBytes = export_binary_stl(mesh.positions, mesh.indices);
   const buf = stlBytes.buffer.slice(
@@ -2848,10 +3186,11 @@ async function promoteLoftToNewBody(mesh: {
   ) as ArrayBuffer;
 
   const compId = ac().id;
-  const loftCount = cadScene.listBodies(compId).filter((b) => b.label.startsWith('Negativform')).length;
-  const label = loftCount > 0 ? `Negativform ${loftCount + 1}` : 'Negativform';
+  const existing = cadScene.listBodies(compId).filter((b) => b.label.startsWith(labelPrefix)).length;
+  const label = existing > 0 ? `${labelPrefix} ${existing + 1}` : labelPrefix;
   const bodyId = cadScene.nextBodyId(compId);
   const body = cadScene.createBody(compId, bodyId, label);
+  assignBodyKind(body, opts?.bodyKind ?? 'solid');
 
   body.meshBuffer = buf;
   body.displayStride = 1;
@@ -2864,11 +3203,348 @@ async function promoteLoftToNewBody(mesh: {
   transformControls.detach();
   cadScene.updateWorldMatrix();
   updateWorldScanBounds(true);
-  setTool('move-body');
+  appMenu.selectTab(opts?.tab ?? 'body', false);
+  setWorkspaceMode(opts?.workspace ?? 'body', {
+    tool: opts?.afterTool ?? 'move-body',
+    keepSketch: opts?.keepSketch,
+  });
   refreshWorkPlaneMesh();
   updateHitFeedback();
   applyScanTheme(bodyDisplayMode, bodyBrightness);
   refreshBrowserPanel();
+  if (opts?.featureKind) recordSolidFeature(opts.featureKind, label, bodyId);
+  updateTransformGizmo();
+  syncOrbitControls();
+}
+
+async function promoteLoftToNewBody(mesh: {
+  positions: Float32Array;
+  indices: Uint32Array;
+  triangle_count: number;
+}) {
+  await promoteMeshToNewBody(mesh, 'Negativform', {
+    tab: 'contours',
+    workspace: 'body',
+    bodyKind: 'loft',
+    featureKind: 'loft',
+  });
+}
+
+function showSolidPreview(mesh: { positions: Float32Array; indices: Uint32Array }) {
+  formGroup.clear();
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(mesh.positions), 3));
+  geom.setIndex(Array.from(mesh.indices));
+  geom.computeVertexNormals();
+  const solid = new THREE.Mesh(
+    geom,
+    new THREE.MeshStandardMaterial({
+      color: 0x5eb3ff,
+      transparent: true,
+      opacity: 0.52,
+      metalness: 0.08,
+      roughness: 0.55,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  solid.name = 'form-solid';
+  formGroup.add(solid);
+  browserState.formVisible = true;
+  formGroup.visible = true;
+  refreshBrowserPanel();
+}
+
+const extrudeHost: ExtrudeHost = {
+  setStatus,
+  getContoursForPicking: contoursForPicking,
+  findContour: (id) => contours.find((c) => c.id === id),
+  getContourWorldMatrix: contourWorldMatrix,
+  getScanSize: () => cadScene.size,
+  getDragScale: () => Math.max(cadScene.size * 0.01, 0.35),
+  getCamera: () => camera,
+  getDom: () => renderer.domElement,
+  loftExtrude: (base, distanceMm) => {
+    try {
+      return loft_contours_json(buildExtrudeLoftPayload(base, distanceMm));
+    } catch {
+      return null;
+    }
+  },
+  showExtrudePreview: showSolidPreview,
+  clearExtrudePreview: () => {
+    formGroup.clear();
+    refreshBrowserPanel();
+  },
+  showExtrudeGizmo: (anchor, normal, distanceMm) => extrudeGizmo.show(anchor, normal, distanceMm),
+  clearExtrudeGizmo: () => extrudeGizmo.clear(),
+  commitExtrude: async (mesh, distanceMm) => {
+    const sketchId = activeSketchId;
+    formGroup.clear();
+    extrudeGizmo.clear();
+    pushUndo(t('undo.extrude'));
+    await promoteMeshToNewBody(mesh, t('solid.bodyExtrude'), {
+      tab: sketchId ? 'sketch' : 'solid',
+      workspace: sketchId ? 'sketch' : 'body',
+      bodyKind: 'solid',
+      featureKind: 'extrude',
+      afterTool: 'navigate',
+      keepSketch: !!sketchId,
+    });
+    selectContour(null);
+    rebuildContourLines();
+    transformControls.detach();
+    syncOrbitControls();
+    setStatus(t('status.extrudeDone', { distance: Math.abs(distanceMm).toFixed(1) }));
+  },
+  highlightContour: (id) => {
+    selectContour(id);
+    rebuildContourLines();
+  },
+  syncOrbitControls,
+  getActiveSketchId: () => activeSketchId,
+};
+
+const revolveHost: RevolveHost = {
+  setStatus,
+  getContoursForPicking: contoursForPicking,
+  findContour: (id) => contours.find((c) => c.id === id),
+  getContourWorldMatrix: contourWorldMatrix,
+  getScanSize: () => cadScene.size,
+  getCamera: () => camera,
+  getDom: () => renderer.domElement,
+  revolveProfile: (base, axis, angleDeg) => {
+    try {
+      return revolve_contour_json(buildRevolvePayload(base, axis, angleDeg));
+    } catch {
+      return null;
+    }
+  },
+  showRevolvePreview: showSolidPreview,
+  clearRevolvePreview: () => {
+    formGroup.clear();
+    refreshBrowserPanel();
+  },
+  commitRevolve: async (mesh, angleDeg) => {
+    formGroup.clear();
+    pushUndo(t('undo.revolve'));
+    await promoteMeshToNewBody(mesh, t('solid.bodyRevolve'), {
+      tab: 'solid',
+      workspace: 'body',
+      bodyKind: 'solid',
+      featureKind: 'revolve',
+    });
+    setStatus(t('status.revolveDone', { angle: angleDeg.toFixed(0) }));
+  },
+  highlightContour: (id) => {
+    selectContour(id);
+    rebuildContourLines();
+  },
+  syncOrbitControls,
+  getActiveSketchId: () => activeSketchId,
+};
+
+const loftHost: LoftHost = {
+  setStatus,
+  getContoursForPicking: contoursForPicking,
+  findContour: (id) => contours.find((c) => c.id === id),
+  getContourWorldMatrix: contourWorldMatrix,
+  getScanSize: () => cadScene.size,
+  getCamera: () => camera,
+  getDom: () => renderer.domElement,
+  loftContours: (payloads) => {
+    try {
+      return loft_contours_json(buildLoftContoursPayload(payloads));
+    } catch {
+      return null;
+    }
+  },
+  showLoftPreview: showSolidPreview,
+  clearLoftPreview: () => {
+    formGroup.clear();
+    refreshBrowserPanel();
+  },
+  commitLoft: async (mesh, profileCount) => {
+    formGroup.clear();
+    if (loftCommitMode === 'negativform') {
+      pushUndo('Negativform erstellen');
+      await promoteLoftToNewBody(mesh);
+      setStatus(
+        t('status.loftDone', {
+          label: ab().label,
+          triangles: mesh.triangle_count.toLocaleString(),
+        }),
+      );
+    } else {
+      pushUndo(t('undo.loft'));
+      await promoteMeshToNewBody(mesh, t('solid.bodyLoft'), {
+        tab: 'solid',
+        workspace: 'body',
+        bodyKind: 'loft',
+        featureKind: 'loft',
+      });
+      setStatus(t('status.loftDoneSolid', { count: profileCount }));
+    }
+    loftCommitMode = 'solid';
+  },
+  highlightContour: (id) => {
+    selectContour(id);
+    rebuildContourLines();
+  },
+  syncOrbitControls,
+  getActiveSketchId: () => activeSketchId,
+};
+
+const solidCommandHosts: SolidCommandHosts = {
+  extrude: extrudeHost,
+  revolve: revolveHost,
+  loft: loftHost,
+};
+
+let loftCommitMode: 'solid' | 'negativform' = 'solid';
+
+function prepareLoftDraft(): boolean {
+  discardIncompleteDraft(true);
+  if (activeDraft && activeDraft.points.length >= 3) {
+    if (!activeDraft.closed) {
+      setStatus(t('status.openContourLoft'));
+      return false;
+    }
+    saveActiveDraft({ recordUndo: false });
+  }
+  return true;
+}
+
+function startSolidCommand(kind: 'extrude' | 'revolve' | 'loft', opts?: { negativform?: boolean }) {
+  cancelAllSolidCommands(solidCommandHosts);
+  if (kind === 'loft' && opts?.negativform) {
+    if (!prepareLoftDraft()) return;
+    loftCommitMode = 'negativform';
+    appMenu.selectTab('contours', false);
+    setWorkspaceMode('contour', { tool: 'navigate' });
+    beginLoft(loftHost);
+    return;
+  }
+  loftCommitMode = 'solid';
+  const fromSketch = !!activeSketchId;
+  if (fromSketch) {
+    appMenu.selectTab('sketch', false);
+    setWorkspaceMode('sketch', { tool: 'navigate', keepSketch: true });
+  } else {
+    appMenu.selectTab('solid', false);
+    setWorkspaceMode('body', { tool: 'navigate' });
+  }
+  if (kind === 'extrude') beginExtrude(extrudeHost);
+  else if (kind === 'revolve') beginRevolve(revolveHost);
+  else beginLoft(loftHost);
+}
+
+async function joinBodiesInComponent() {
+  const bodies = cadScene.listBodies(ac().id).filter((b) => b.geometry && b.meshBuffer);
+  if (bodies.length < 2) {
+    setStatus(t('status.joinNeedTwo'));
+    return;
+  }
+
+  let unionGeom = await booleanUnionBodies(bodies);
+  let usedConcat = false;
+
+  if (!unionGeom) {
+    unionGeom = mergeBodyGeometries(bodies);
+    usedConcat = !!unionGeom;
+  }
+  if (!unionGeom) {
+    setStatus(t('status.joinFailed'));
+    return;
+  }
+
+  const { positions, indices } = geometryMeshData(unionGeom);
+  unionGeom.dispose();
+  const mesh = {
+    positions,
+    indices,
+    triangle_count: (indices.length / 3) as number,
+  };
+  pushUndo(t('undo.join'));
+  await promoteMeshToNewBody(mesh, t('solid.bodyJoin'), {
+    tab: 'solid',
+    workspace: 'body',
+    bodyKind: 'solid',
+    featureKind: 'join',
+  });
+  setStatus(
+    usedConcat
+      ? t('status.joinConcatFallback', { count: bodies.length })
+      : t('status.joinBooleanDone', { count: bodies.length }),
+  );
+}
+
+async function rectangularPatternBodies() {
+  const src = ab();
+  if (!src.meshBuffer || !src.geometry) {
+    setStatus(t('status.patternNeedBody'));
+    return;
+  }
+  const cols = parsePromptInt(t('solid.patternColsPrompt'), 2);
+  if (cols === null) return;
+  const rows = parsePromptInt(t('solid.patternRowsPrompt'), 2);
+  if (rows === null) return;
+  const spacingX = parsePromptFloat(t('solid.patternSpacingXPrompt'), 40);
+  if (spacingX === null) return;
+  const spacingY = parsePromptFloat(t('solid.patternSpacingYPrompt'), 40);
+  if (spacingY === null) return;
+
+  pushUndo(t('undo.rectPattern'));
+  let created = 1;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (r === 0 && c === 0) continue;
+      const label = `${src.label} ${r + 1}×${c + 1}`;
+      const transform: BodyTransform = {
+        ...src.transform,
+        posX: src.transform.posX + c * spacingX,
+        posY: src.transform.posY + r * spacingY,
+      };
+      await duplicateBodyFrom(src, label, transform, false);
+      created++;
+    }
+  }
+  refreshBrowserPanel();
+  recordSolidFeature('rect-pattern', `${src.label} ${cols}×${rows}`, src.id);
+  setStatus(t('status.rectPatternDone', { count: created }));
+}
+
+async function circularPatternBodies() {
+  const src = ab();
+  if (!src.meshBuffer || !src.geometry) {
+    setStatus(t('status.patternNeedBody'));
+    return;
+  }
+  const count = parsePromptInt(t('solid.patternCountPrompt'), 6);
+  if (count === null || count < 2) {
+    setStatus(t('status.patternNeedCount'));
+    return;
+  }
+
+  pushUndo(t('undo.circPattern'));
+  const step = 360 / count;
+  for (let i = 1; i < count; i++) {
+    const label = `${src.label} ∠${Math.round(i * step)}°`;
+    const transform: BodyTransform = {
+      ...src.transform,
+      rotY: src.transform.rotY + i * step,
+    };
+    await duplicateBodyFrom(src, label, transform, false);
+  }
+  refreshBrowserPanel();
+  recordSolidFeature('circ-pattern', `${src.label} ×${count}`, src.id);
+  setStatus(t('status.circPatternDone', { count }));
+}
+
+async function mirrorActiveBodyPrompt() {
+  const axis = parseMirrorAxis(t('solid.mirrorAxisPrompt'), 'x');
+  if (!axis) return;
+  await mirrorActiveBody(axis);
 }
 
 function contoursToProject(): ProjectContour[] {
@@ -2900,9 +3576,19 @@ function contoursToProject(): ProjectContour[] {
   });
 }
 
+function projectHasSketchData(): boolean {
+  return (
+    sketches.length > 0 ||
+    contours.length > 0 ||
+    sketchDimensions.length > 0 ||
+    !!activeSketchId
+  );
+}
+
 async function saveProject() {
-  if (!ab().meshBuffer) {
-    setStatus('Kein Körper — zuerst Geometrie laden, dann Projekt speichern');
+  const meshBuf = ab().meshBuffer;
+  if (!meshBuf && !projectHasSketchData()) {
+    setStatus(t('status.noBodySave'));
     return;
   }
   await initWasm();
@@ -2923,6 +3609,7 @@ async function saveProject() {
           id: b.id,
           label: b.label,
           displayStride: b.displayStride,
+          bodyKind: sceneBody?.bodyKind,
           transform,
           solidColor:
             solidColor !== SOLID_BODY_COLOR ? numberToHexColor(solidColor) : undefined,
@@ -2940,28 +3627,44 @@ async function saveProject() {
     sketchUnit,
     activeSketchId: activeSketchId ?? undefined,
   });
-  const packed = pack_project(JSON.stringify(meta), new Uint8Array(ab().meshBuffer!));
+  const meshEntries = cadScene
+    .listBodies()
+    .filter((b) => b.meshBuffer && stlHasTriangles(b.meshBuffer))
+    .map((b) => ({ id: b.id, stl: new Uint8Array(b.meshBuffer!) }));
+
+  const packed =
+    meshEntries.length > 0
+      ? pack_project_multi(JSON.stringify(meta), buildMeshArchive(meshEntries))
+      : pack_project_multi(JSON.stringify(meta), buildMeshArchive([]));
   const blob = new Blob([new Uint8Array(packed)], { type: 'application/octet-stream' });
-  const base = ab().label.replace(/\.stl$/i, '') || 'cad-tracer-projekt';
+  const base = ab().label.replace(/\.stl$/i, '') || 'cad-projekt';
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `${base}${PROJECT_EXTENSION}`;
   a.click();
   URL.revokeObjectURL(a.href);
   setStatus(
-    `Projekt gespeichert (${base}${PROJECT_EXTENSION}) — Körper + ${contours.length} Kontur(en)`,
+    t('status.projectSaved', {
+      base: `${base}${PROJECT_EXTENSION}`,
+      count: contours.length,
+      bodies: meshEntries.length,
+    }),
   );
 }
 
+type UnpackedProject =
+  | { meta: string; format: 'v1'; stl: Uint8Array }
+  | { meta: string; format: 'v2'; bodies: { id: string; stl: Uint8Array }[] };
+
 async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   await initWasm();
-  let unpacked: { meta: string; stl: Uint8Array };
+  let unpacked: UnpackedProject;
   try {
-    unpacked = unpack_project(new Uint8Array(buf)) as { meta: string; stl: Uint8Array };
+    unpacked = unpack_project(new Uint8Array(buf)) as UnpackedProject;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Projekt laden fehlgeschlagen:', err);
-    setStatus(`Projekt laden fehlgeschlagen: ${msg}`);
+    setStatus(t('status.projectLoadFailed', { msg }));
     return;
   }
 
@@ -2969,7 +3672,7 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   try {
     meta = parseProjectMeta(unpacked.meta);
   } catch (err) {
-    setStatus(err instanceof Error ? err.message : 'Projekt-Metadaten ungültig');
+    setStatus(err instanceof Error ? err.message : t('status.projectMetaInvalid'));
     return;
   }
 
@@ -2989,7 +3692,9 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   activeDraft = null;
   clearDraftVisuals();
   undoHistory.clear();
+  featureTimeline.clear();
   refreshHistoryTimeline();
+  refreshFeatureTimeline();
 
   planeAxis = meta.planeAxis;
   planeAxisSel.value = meta.planeAxis;
@@ -2999,15 +3704,14 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   hitTol.value = String(meta.hitTolerance);
   if (hitTolVal) hitTolVal.textContent = String(meta.hitTolerance);
 
-  const stlBytes = unpacked.stl instanceof Uint8Array ? unpacked.stl : new Uint8Array(unpacked.stl);
-  const stlBuf = stlBytes.slice().buffer;
+  syncSceneFromProjectMeta(cadScene, meta);
+  for (const body of cadScene.listBodies()) clearBodyMeshState(body);
+
   const comp = meta.components.find((c) => c.id === meta.activeComponentId) ?? meta.components[0];
   const primary = comp.bodies.find((b) => b.id === meta.activeBodyId) ?? comp.bodies[0];
-  cadScene.setActiveBody(primary.id);
-  const sceneComp = cadScene.getComponent(comp.id);
-  if (sceneComp) sceneComp.label = comp.label;
-  const sceneBody = cadScene.getBody(primary.id);
-  if (sceneBody) sceneBody.label = primary.label;
+  const projectBodyById = new Map(
+    meta.components.flatMap((c) => c.bodies.map((b) => [b.id, b] as const)),
+  );
 
   bodySolidColors.clear();
   bodyTraceAssist.clear();
@@ -3015,10 +3719,43 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
     for (const b of c.bodies) {
       if (b.solidColor) bodySolidColors.set(b.id, hexColorToNumber(b.solidColor));
       if (b.traceAssist) bodyTraceAssist.set(b.id, true);
+      const sceneBody = cadScene.getBody(b.id);
+      if (sceneBody && b.bodyKind) assignBodyKind(sceneBody, b.bodyKind);
     }
   }
 
-  await loadStlBuffer(stlBuf, primary.label, primary.displayStride);
+  if (unpacked.format === 'v2') {
+    for (const entry of unpacked.bodies) {
+      const pb = projectBodyById.get(entry.id);
+      const body = cadScene.getBody(entry.id);
+      if (!body || !pb) continue;
+      const stlBuf = entry.stl.slice().buffer;
+      await restoreBodyMesh(
+        body,
+        stlBuf,
+        pb.label,
+        pb.displayStride,
+        pb.bodyKind ?? 'scan',
+      );
+    }
+  } else {
+    const stlBytes = unpacked.stl instanceof Uint8Array ? unpacked.stl : new Uint8Array(unpacked.stl);
+    const stlBuf = stlBytes.slice().buffer;
+    const activeBody = cadScene.getBody(primary.id);
+    if (activeBody) {
+      await restoreBodyMesh(
+        activeBody,
+        stlBuf,
+        primary.label,
+        primary.displayStride,
+        primary.bodyKind ?? 'scan',
+      );
+    }
+  }
+
+  cadScene.setActiveBody(primary.id);
+  const hasAnyMesh = cadScene.listBodies().some((b) => b.meshBuffer && stlHasTriangles(b.meshBuffer));
+  if (!hasAnyMesh) setupEmptyProjectView();
   applyAllTraceAssist();
 
   setPlanePositionValue(meta.planePosition);
@@ -3102,23 +3839,42 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   updateSketchRibbonState(activeSketchId, tool);
   syncToolButtons(tool);
 
+  if (activeSketchId) {
+    appMenu.selectTab('sketch', false);
+    setWorkspaceMode('sketch', { tool: 'navigate', keepSketch: true });
+  } else {
+    setWorkspaceMode('body', { tool: 'navigate' });
+  }
+
   setStatus(
-    `Projekt geladen — ${contours.length} Kontur(en), ${sketches.length} Skizze(n), ${sketchDimensions.length} Bemaßung(en)`,
+    t('status.projectLoaded', {
+      contours: contours.length,
+      sketches: sketches.length,
+      dims: sketchDimensions.length,
+    }),
   );
 }
 
-async function loadStlBuffer(buf: ArrayBuffer, label: string, stride = ab().displayStride) {
+async function loadStlBuffer(
+  buf: ArrayBuffer,
+  label: string,
+  stride = ab().displayStride,
+  bodyKind: BodyKind = 'scan',
+) {
   disposeSolidBodyGeom(ab().id);
   disposeFestkoerperMesh(ab());
   ab().meshBuffer = buf;
   ab().label = label;
   ab().displayStride = stride;
-  setStatus(`Lade ${label}… (WASM, Anzeige 1/${stride})`);
+  assignBodyKind(ab(), bodyKind);
+  setStatus(t('status.loadingStl', { label, stride }));
   await new Promise((r) => setTimeout(r, 0));
   const mesh = parse_stl_with_stride(new Uint8Array(buf), stride);
   transformControls.detach();
   undoHistory.clear();
+  featureTimeline.clear();
   refreshHistoryTimeline();
+  refreshFeatureTimeline();
   ab().meshGroup.clear();
   ac().alignment = { ...DEFAULT_ALIGNMENT };
   ab().transform = { ...DEFAULT_ALIGNMENT };
@@ -3139,8 +3895,10 @@ async function loadStlBuffer(buf: ArrayBuffer, label: string, stride = ab().disp
   updateHitFeedback();
   ac().group.visible = ac().visible;
   refreshBrowserPanel();
+  appMenu.selectTab('align', false);
+  setWorkspaceMode('body', { tool: 'navigate' });
   setStatus(
-    `${label}: ${mesh.triangle_count.toLocaleString()} Dreiecke — Scan mit „Ausrichten“ drehen/verschieben`,
+    t('status.stlLoaded', { label, triangles: mesh.triangle_count.toLocaleString() }),
   );
 }
 
@@ -3401,8 +4159,8 @@ function discardIncompleteDraft(silent = false): boolean {
   if (!silent) {
     setStatus(
       n > 0
-        ? `Unvollständigen Entwurf verworfen (${n} Punkt(e)) — war keine echte 3. Kontur`
-        : 'Leeren Entwurf verworfen',
+        ? t('status.draftDiscardedIncomplete', { n })
+        : t('status.draftDiscardedEmpty'),
     );
   }
   return true;
@@ -3411,17 +4169,13 @@ function discardIncompleteDraft(silent = false): boolean {
 function statusWhenNoOpenDraft() {
   const closedCount = closedContourCount();
   if (closedCount >= 2) {
-    setStatus(
-      `${closedCount} geschlossene Konturen bereit — jetzt „Negativform als Körper speichern“`,
-    );
+    setStatus(t('status.contoursReady', { count: closedCount }));
   } else if (closedCount === 1) {
-    setStatus(
-      '1 Kontur gespeichert — Ebene verschieben (Ausrichten), 2. Kontur zeichnen & schließen, dann Negativform erstellen',
-    );
+    setStatus(t('status.oneContourSaved'));
   } else if (contours.length > 0) {
-    setStatus(`Keine offene Kontur — ${contours.length} Kontur(en) gespeichert`);
+    setStatus(t('status.noOpenContour', { count: contours.length }));
   } else {
-    setStatus('Keine Kontur — „Linie“ wählen und im 3D-Fenster klicken');
+    setStatus(t('status.noContour'));
   }
 }
 
@@ -3464,15 +4218,15 @@ function saveActiveDraft(options: { forceClosed?: boolean; recordUndo?: boolean 
   if (saved.closed) {
     if (closedSaved < 2) {
       setStatus(
-        `Kontur gespeichert (${pointCount} Punkte, grün) — ${closedSaved}/2 für Negativform · Ebene verschieben → 2. Kontur`,
+        t('status.contourSavedGreen', { pointCount, closedSaved }),
       );
     } else {
       setStatus(
-        `Kontur gespeichert (${pointCount} Punkte) — ${closedSaved} geschlossene Konturen · jetzt „Negativform als Körper“`,
+        t('status.contourSavedClosed', { pointCount, closedSaved }),
       );
     }
   } else {
-    setStatus(`Kontur gespeichert (${pointCount} Punkte, offen) — zum Schließen Startpunkt anklicken`);
+    setStatus(t('status.contourSavedOpen', { pointCount }));
   }
   return true;
 }
@@ -3490,7 +4244,7 @@ function refreshContourList() {
       setTool('edit');
       selectContour(c.id);
       setStatus(
-        `Kontur #${i + 1} — Arbeitsebene bleibt · Punkte auf ${planeAxis.toUpperCase()} @ ${planePosition.toFixed(1)} ziehen`,
+        t('status.contourEdit', { n: i + 1, axis: planeAxis.toUpperCase(), pos: planePosition.toFixed(1) }),
       );
     });
     const del = document.createElement('button');
@@ -3527,7 +4281,7 @@ function addPointFromEvent(e: PointerEvent, recordUndo = true) {
         planePosition,
       );
   if (!hit) {
-    setStatus('Kein Treffer — Ansicht drehen oder Arbeitsebenen-Position anpassen');
+    setStatus(t('status.noHit'));
     return;
   }
   if (activeDraft!.closed) {
@@ -3557,10 +4311,12 @@ function addPointFromEvent(e: PointerEvent, recordUndo = true) {
       getEffectiveHitTolerance(),
     );
     setStatus(
-      `Punkt ${activeDraft!.points.length}: ${onScan ? 'trifft Körper — leuchtend gelb' : 'kein Treffer — dunkelgrau'}`,
+      onScan
+        ? t('status.pointHit', { n: activeDraft!.points.length })
+        : t('status.pointMiss', { n: activeDraft!.points.length }),
     );
   } else {
-    setStatus(`Punkt ${activeDraft!.points.length} gesetzt`);
+    setStatus(t('status.pointSet', { n: activeDraft!.points.length }));
   }
 }
 
@@ -3585,7 +4341,7 @@ function drawLassoOverlay() {
 
 function finishLasso() {
   if (lassoScreen.length < 4) {
-    setStatus('Lasso zu klein');
+    setStatus(t('status.lassoTooSmall'));
     lassoScreen = [];
     clearOverlay();
     return;
@@ -3614,7 +4370,7 @@ function finishLasso() {
   if (activeDraft!.points.length >= 3) {
     saveActiveDraft({ recordUndo: false });
   } else {
-    setStatus(`Lasso: nur ${activeDraft!.points.length} Punkte — größer zeichnen (min. 3)`);
+    setStatus(t('status.lassoTooFew', { count: activeDraft!.points.length }));
   }
 }
 
@@ -3685,14 +4441,14 @@ function handleEditPointerDown(e: PointerEvent) {
     const idx = insertPoint(c, target.segmentIndex, p);
     selectContour(c.id, idx);
     rebuildContourLines();
-    setStatus(`Punkt eingefügt (${c.points.length} Punkte) — ziehen oder Rechtsklick für Kurve`);
+    setStatus(t('status.pointInserted', { count: c.points.length }));
     return;
   }
 
   if (target?.kind === 'contour') {
     selectContour(target.contourId);
     setStatus(
-      `Kontur gewählt — Bearbeitung auf Arbeitsebene ${planeAxis.toUpperCase()} @ ${planePosition.toFixed(1)}`,
+      t('status.contourSelected', { axis: planeAxis.toUpperCase(), pos: planePosition.toFixed(1) }),
     );
     return;
   }
@@ -3711,7 +4467,7 @@ function handleEditPointerDown(e: PointerEvent) {
 
   const c = getSelectedContour();
   if (!c) {
-    setStatus('Zuerst Kontur anklicken (oder in der Liste wählen)');
+    setStatus(t('status.selectContourFirst'));
     return;
   }
   const ins = findInsertOnContour(contourInWorldSpace(c, contourWorldMatrix(c)), hit);
@@ -3721,7 +4477,7 @@ function handleEditPointerDown(e: PointerEvent) {
   const idx = insertPoint(c, ins.afterIndex, p);
   selectContour(c.id, idx);
   rebuildContourLines();
-  setStatus(`Punkt eingefügt — Rechtsklick auf Punkt für Ecke / Glatt / Kurve`);
+  setStatus(t('status.pointInsertedMenu'));
 }
 
 function applyPointMenuAction(action: string) {
@@ -3734,45 +4490,48 @@ function applyPointMenuAction(action: string) {
   if (action === 'corner' || action === 'smooth' || action === 'curve') {
     setPointType(c, i, action as ContourPointType);
     selectContour(c.id, i);
-    const labels = { corner: 'Ecke', smooth: 'Glatt', curve: 'Kurve' };
     setStatus(
       action === 'curve'
-        ? `Punkt ${i + 1}: Kurve — blaue Griffe ziehen (auch aus der Ebene raus = 3D-Bogen)`
-        : `Punkt ${i + 1}: ${labels[action as ContourPointType]}`,
+        ? t('status.pointCurve', { n: i + 1 })
+        : t('status.pointType', { n: i + 1, type: t(`pointType.${action}`) }),
     );
   } else if (action === 'delete') {
     if (!deletePoint(c, i)) {
-      setStatus('Mindest-Punktzahl — Punkt kann nicht gelöscht werden');
+      setStatus(t('status.minPointsDelete'));
       hidePointMenu();
       return;
     }
     selectContour(c.id, Math.min(i, c.points.length - 1));
     rebuildContourLines();
-    setStatus(`Punkt gelöscht (${c.points.length} übrig)`);
+    setStatus(t('status.pointDeleted', { count: c.points.length }));
   } else if (action === 'toggle-closed') {
     if (!c.closed && c.points.length < 3) {
-      setStatus('Mindestens 3 Punkte zum Schließen');
+      setStatus(t('status.minPointsClose'));
     } else {
       c.closed = !c.closed;
       rebuildContourLines();
-      setStatus(c.closed ? 'Kontur geschlossen' : 'Kontur geöffnet');
+      setStatus(c.closed ? t('status.contourClosed') : t('status.contourOpened'));
     }
   } else if (action === 'insert') {
     const p = c.points[i].clone();
     const idx = insertPoint(c, i, p);
     selectContour(c.id, idx);
     rebuildContourLines();
-    setStatus('Punkt dupliziert — ziehen zum Anpassen');
+    setStatus(t('status.pointDuplicated'));
   }
   hidePointMenu();
 }
 
-function setTool(next: Tool) {
+function setTool(next: Tool, opts?: { skipWorkspaceCheck?: boolean }) {
   if (next === tool) {
-    next = activeSketchId ? 'navigate' : 'sketch-pick';
+    next = activeSketchId ? 'navigate' : workspaceMode === 'sketch' ? 'sketch-pick' : 'navigate';
+  }
+  if (!opts?.skipWorkspaceCheck && !toolAllowedInWorkspace(next, workspaceMode, activeSketchId)) {
+    setStatus(workspaceHintForTool(next, workspaceMode));
+    return;
   }
   if (!activeSketchId && toolRequiresActiveSketch(next)) {
-    setStatus('Zuerst Skizze starten — Ebene XY / XZ / YZ anklicken oder Neue Skizze');
+    setStatus(t('status.needSketchFirst'));
     tool = 'sketch-pick';
     syncToolButtons('sketch-pick');
     updateSketchRibbonState(null, 'sketch-pick');
@@ -3809,28 +4568,6 @@ function setTool(next: Tool) {
   syncToolButtons(next);
   viewport.className = `tool-${next}`;
   if (planeDragMode) viewport.classList.add('tool-plane-drag');
-  const sketchTab = activeSketchId ? 'sketch' : 'draw';
-  const tabForTool: Partial<Record<Tool, 'align' | 'draw' | 'body' | 'sketch'>> = {
-    align: 'align',
-    'move-body': 'body',
-    'scale-body': 'body',
-    'press-pull': 'body',
-    'smooth-body': 'body',
-    'smooth-section': 'body',
-    'sketch-pick': 'sketch',
-    'sketch-line': 'sketch',
-    'sketch-circle': 'sketch',
-    'sketch-arc': 'sketch',
-    'sketch-rect': 'sketch',
-    'sketch-triangle': 'sketch',
-    'sketch-dim': 'sketch',
-    polyline: sketchTab,
-    freehand: sketchTab,
-    lasso: sketchTab,
-    edit: activeSketchId ? 'sketch' : 'draw',
-  };
-  const tab = tabForTool[next];
-  if (tab) appMenu.selectTab(tab, false);
   if (next === 'sketch-pick') {
     if (!activeSketchId && isEmptyProject()) setupEmptyProjectView();
     updateOriginPlaneHighlight(
@@ -3840,9 +4577,9 @@ function setTool(next: Tool) {
   }
   const navHint =
     activeSketchId || next === 'sketch-pick' || next.startsWith('sketch-')
-      ? ` · ${SKETCH_VIEWPORT_NAV_HINT}`
+      ? ` · ${getSketchViewportNavHint()}`
       : '';
-  toolHint.textContent = (TOOL_HINTS[next] ?? next) + navHint;
+  toolHint.textContent = getToolHint(next) + navHint;
   syncOrbitControls();
   if (next === 'edit') {
     refreshWorkPlaneMesh(getPlaneHitVisual());
@@ -3857,7 +4594,7 @@ function setTool(next: Tool) {
     sketchDims.clearSession();
     viewport.classList.remove('sketch-dim-can-pick');
   } else if (next === 'sketch-dim') {
-    setStatus('Bemaßung: Kante anfahren (leuchtet auf) · klicken · Maßlinie ziehen · Wert eingeben · Doppelklick auf Maßzahl = bearbeiten');
+    setStatus(t('status.dimPick'));
   }
   if (next !== 'lasso') {
     lassoScreen = [];
@@ -3867,7 +4604,7 @@ function setTool(next: Tool) {
   updateHitFeedback();
   updateTransformGizmo();
   updateSketchRibbonState(activeSketchId, next);
-  setStatus(`Werkzeug: ${next}`);
+  setStatus(t('status.tool', { tool: next }));
 }
 
 function applyPlaneForPreset(preset: ViewCubePreset) {
@@ -3927,62 +4664,10 @@ function updateSlice() {
   clipPlanes.forEach((p) => p.normal.normalize());
 }
 
-async function buildLoft() {
-  discardIncompleteDraft(true);
-  if (activeDraft && activeDraft.points.length >= 3) {
-    if (!activeDraft.closed) {
-      setStatus('Offene Kontur — zuerst schließen (Startpunkt magenta anklicken), dann Negativform erstellen');
-      return;
-    }
-    saveActiveDraft({ recordUndo: false });
-  }
-  const loftContours = contours.filter((c) => c.closed && c.points.length >= 3);
-  const loftAxis = loftContours[0]?.axis;
-  if (loftContours.length >= 2 && loftContours.some((c) => c.axis !== loftAxis)) {
-    setStatus('Alle Konturen müssen dieselbe Ebene nutzen (z. B. beide XY) — sonst passt die Form nicht');
-    return;
-  }
-  if (loftContours.length < 2) {
-    if (loftContours.length === 1) {
-      setStatus('1 Kontur gespeichert — Ebene verschieben, 2. geschlossene Kontur zeichnen, dann Negativform erstellen');
-    } else {
-      setStatus('Mindestens 2 geschlossene Konturen (je ≥3 Punkte) — zeichnen, schließen (grün), speichern');
-    }
-    return;
-  }
-  const payload = JSON.stringify({
-    contours: loftContours.map((c) => {
-      const world = contourInWorldSpace(c, contourWorldMatrix(c));
-      const useFull3d = isContourAttached(c) || contourHas3dDeviation(c);
-      return {
-        axis: world.axis,
-        position: world.position,
-        points: loftPoints(world, useFull3d),
-        closed: world.closed,
-        full_3d: useFull3d,
-      };
-    }),
-    closed_ends: true,
-  });
-  let mesh;
-  try {
-    mesh = loft_contours_json(payload);
-  } catch (err) {
-    setStatus(err instanceof Error ? err.message : 'Negativform fehlgeschlagen — Konturen prüfen');
-    return;
-  }
-  formGroup.clear();
-  pushUndo('Negativform erstellen');
-  await promoteLoftToNewBody(mesh);
-  setStatus(
-    `Negativform als „${ab().label}“ — ${mesh.triangle_count.toLocaleString()} Dreiecke · Frei bewegen zum Positionieren`,
-  );
-}
-
 async function exportForm() {
   const body = ab();
   if (!body.meshBuffer && !body.geometry) {
-    setStatus('Kein Körper-Mesh — zuerst Negativform als Körper speichern oder STL laden');
+    setStatus(t('status.noBodyMesh'));
     return;
   }
   if (
@@ -4010,7 +4695,7 @@ async function exportForm() {
   a.download = `${base}.stl`;
   a.click();
   URL.revokeObjectURL(a.href);
-  setStatus(`STL exportiert — ${base}.stl`);
+  setStatus(t('status.stlExported', { base }));
 }
 
 function isSketchDimValueUiTarget(target: EventTarget | null): boolean {
@@ -4048,6 +4733,10 @@ renderer.domElement.addEventListener(
 
 // Pointer handlers
 renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (isSolidCommandActive() && handleSolidCommandPointerDown(e, solidCommandHosts)) {
+    e.preventDefault();
+    return;
+  }
   if (
     activeSketchId &&
     sketchDims.awaitingValue &&
@@ -4190,6 +4879,7 @@ renderer.domElement.addEventListener('dblclick', (e) => {
 });
 
 renderer.domElement.addEventListener('pointermove', (e) => {
+  if (handleSolidCommandPointerMove(e, solidCommandHosts)) return;
   if (smoothPaint) {
     const now = performance.now();
     if (now - lastSmoothPickMs >= 36) {
@@ -4299,7 +4989,12 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   }
 });
 
+window.addEventListener('pointercancel', (e) => {
+  if (handleSolidCommandPointerCancel(e, solidCommandHosts)) return;
+});
+
 window.addEventListener('pointerup', (e) => {
+  if (handleSolidCommandPointerUp(e, solidCommandHosts)) return;
   if (sketchInteraction?.mode === 'drag') {
     handleSketchPointerUp(e);
     return;
@@ -4322,7 +5017,7 @@ window.addEventListener('pointerup', (e) => {
     if (body?.geometry) {
       void commitBodyGeometry(body).then(() => {
         updateWorldScanBounds();
-        setStatus(`Press Pull auf „${body.label}“ angewendet`);
+        setStatus(t('status.pressPullApplied', { label: body.label }));
       });
     }
     return;
@@ -4333,7 +5028,7 @@ window.addEventListener('pointerup', (e) => {
     if (renderer.domElement.hasPointerCapture(e.pointerId)) {
       renderer.domElement.releasePointerCapture(e.pointerId);
     }
-    setStatus('Kontur angepasst — Rechtsklick auf Punkt für Kurventyp');
+    setStatus(t('status.contourAdjusted'));
     return;
   }
   if (sketchDims.shouldFinishPlacement()) {
@@ -4362,9 +5057,9 @@ window.addEventListener('pointerup', (e) => {
       saveActiveDraft({ recordUndo: true });
     } else if (activeSketchId) {
       discardIncompleteDraft(true);
-      setStatus('Freihand zu kurz — mindestens 3 Punkte');
+      setStatus(t('status.freehandTooShort'));
     } else {
-      setStatus(`Freihand: ${activeDraft.points.length} Punkte — „Kontur fertig“ zum Speichern`);
+      setStatus(t('status.freehandDraft', { count: activeDraft.points.length }));
     }
   }
   if (tool === 'lasso' && isDrawing) {
@@ -4382,12 +5077,6 @@ document.querySelectorAll('[data-sketch-axis]').forEach((btn) => {
   btn.addEventListener('click', () => {
     const axis = (btn as HTMLElement).dataset.sketchAxis as PlaneAxis;
     beginSketchOnPlane(axis, 0);
-  });
-});
-
-document.querySelectorAll('[data-fusion-tab="sketch"]').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    if (!activeSketchId) enterSketchPickMode();
   });
 });
 
@@ -4437,10 +5126,10 @@ sketchDims.bindUi(() => {
   if (tool === 'sketch-dim') {
     setStatus(
       sketchDimKind === 'linear'
-        ? 'Strecke: Kante anfahren → klicken → Maßlinie ziehen → Wert eingeben'
+        ? t('status.dimLinear')
         : sketchDimKind === 'radius'
-          ? 'Radius: Kreis anfahren → klicken → Maßlinie ziehen → Wert eingeben'
-          : 'Durchmesser: Kreis anfahren → klicken → Maßlinie ziehen → Wert eingeben',
+          ? t('status.dimRadius')
+          : t('status.dimDiameter'),
     );
   }
 });
@@ -4464,13 +5153,13 @@ planePos.addEventListener('input', () => {
 document.getElementById('hit-points')!.addEventListener('change', (e: Event) => {
   hitPointFeedback = (e.target as HTMLInputElement).checked;
   updateHitFeedback();
-  setStatus(hitPointFeedback ? 'Punkt-Farben aktiv' : 'Punkt-Farben aus');
+  setStatus(hitPointFeedback ? t('status.hitPointsOn') : t('status.hitPointsOff'));
 });
 
 document.getElementById('hit-plane')!.addEventListener('change', (e: Event) => {
   hitPlaneFeedback = (e.target as HTMLInputElement).checked;
   updateHitFeedback();
-  setStatus(hitPlaneFeedback ? 'Ebenen-Farben aktiv' : 'Ebenen-Farben aus');
+  setStatus(hitPlaneFeedback ? t('status.hitPlaneOn') : t('status.hitPlaneOff'));
 });
 
 document.getElementById('hit-tolerance')!.addEventListener('input', () => {
@@ -4487,8 +5176,8 @@ document.getElementById('tmode-world')!.addEventListener('click', () => {
   transformSpace = transformSpace === 'world' ? 'local' : 'world';
   transformControls.setSpace(transformSpace);
   const btn = document.getElementById('tmode-world')!;
-  btn.textContent = transformSpace === 'world' ? 'Welt' : 'Lokal';
-  setStatus(transformSpace === 'world' ? 'Weltkoordinaten' : 'Lokal am Körper');
+  btn.textContent = transformSpace === 'world' ? t('transform.world') : t('transform.local');
+  setStatus(transformSpace === 'world' ? t('status.worldSpace') : t('status.localSpace'));
 });
 
 document.getElementById('plane-drag-toggle')!.addEventListener('click', () => {
@@ -4506,13 +5195,13 @@ document.getElementById('align-to-plane')!.addEventListener('click', () => {
 
 document.getElementById('align-reset')!.addEventListener('click', () => {
   resetScanAlignment();
-  setStatus('Scan-Ausrichtung des Körpers zurückgesetzt');
+  setStatus(t('status.scanAlignReset'));
 });
 
 document.getElementById('align-fit-view')!.addEventListener('click', () => {
   updateWorldScanBounds();
   fitCameraToBox(cadScene.bounds);
-  setStatus('Kamera auf ausgerichteten Körper zentriert');
+  setStatus(t('status.cameraFit'));
 });
 
 document.getElementById('close-contour')!.addEventListener('click', () => {
@@ -4548,7 +5237,7 @@ document.getElementById('discard-draft')!.addEventListener('click', () => {
   clearDraftVisuals();
   const ready = closedContourCount();
   if (ready >= 2) {
-    setStatus(`Entwurf verworfen (${n} Punkt(e)) — ${ready} Konturen bereit, jetzt „Negativform erstellen“`);
+    setStatus(t('status.draftDiscarded', { n, ready }));
   } else {
     statusWhenNoOpenDraft();
   }
@@ -4556,7 +5245,9 @@ document.getElementById('discard-draft')!.addEventListener('click', () => {
 document.getElementById('undo-point')!.addEventListener('click', () => performUndo());
 document.getElementById('redo-point')!.addEventListener('click', () => performRedo());
 
-document.getElementById('loft-form')!.addEventListener('click', () => void buildLoft());
+document.getElementById('loft-form')!.addEventListener('click', () =>
+  startSolidCommand('loft', { negativform: true }),
+);
 document.getElementById('export-stl')!.addEventListener('click', exportForm);
 document.getElementById('body-transform-reset')!.addEventListener('click', resetBodyTransform);
 document.getElementById('body-duplicate')!.addEventListener('click', () => void duplicateActiveBody());
@@ -4619,7 +5310,7 @@ function clearAllContours() {
   sketchDims.refreshList();
   refreshContourList();
   updateSketchRibbonState(null, 'sketch-pick');
-  if (appMenu.active === 'sketch') setTool('sketch-pick');
+  if (workspaceMode === 'sketch') setTool('sketch-pick', { skipWorkspaceCheck: true });
 }
 
 document.getElementById('clear-contours')!.addEventListener('click', clearAllContours);
@@ -4633,7 +5324,7 @@ scanFile.addEventListener('change', async () => {
 
 async function reloadScanFromBuffer() {
   if (!ab().meshBuffer) {
-    setStatus('Keine Geometrie im Speicher');
+    setStatus(t('status.noGeometry'));
     return;
   }
   const stride = parseInt((document.getElementById('scan-stride') as HTMLInputElement).value) || 1;
@@ -4648,7 +5339,7 @@ document.getElementById('scan-mode')!.addEventListener('change', (e: Event) => {
   const brightness =
     parseInt((document.getElementById('scan-brightness') as HTMLInputElement).value) / 100;
   applyScanTheme(mode, brightness);
-  setStatus(`Darstellung: ${SCAN_MODE_LABELS[mode]}`);
+  setStatus(t('status.displayMode', { mode: getScanModeLabel(mode) }));
 });
 
 document.getElementById('scan-brightness')!.addEventListener('input', (e: Event) => {
@@ -4846,7 +5537,7 @@ viewportMenu.querySelectorAll('[data-menu-action]').forEach((btn) => {
       document.getElementById('tmode-world')!.click();
     } else if (action === 'align-reset') {
       resetScanAlignment();
-      setStatus('Ausrichtung des Körpers zurückgesetzt');
+      setStatus(t('status.alignmentResetBody'));
     } else if (action === 'panel-align') {
       appMenu.openAlignPanel();
     }
@@ -4915,6 +5606,10 @@ document.addEventListener('pointerdown', (e) => {
 
 function handleFusionCancel(): boolean {
   let consumed = false;
+  if (isSolidCommandActive()) {
+    cancelAllSolidCommands(solidCommandHosts);
+    consumed = true;
+  }
   if (sketchDims.hasSession || sketchDims.preselectedEdge) {
     sketchDims.clearSession();
     if (tool === 'sketch-dim') setTool('navigate');
@@ -4942,23 +5637,31 @@ function applyFusionShortcutAction(action: FusionShortcutAction) {
     case 'tool': {
       if (action.tool === 'move-body' || action.tool === 'press-pull' || action.tool === 'scale-body') {
         appMenu.selectTab('body', false);
+        setWorkspaceMode('body');
       } else if (
         action.tool.startsWith('sketch-') ||
         action.tool === 'edit' ||
         action.tool === 'freehand'
       ) {
         appMenu.selectTab('sketch', false);
+        setWorkspaceMode('sketch');
+      } else if (action.tool === 'polyline' || action.tool === 'lasso') {
+        appMenu.selectTab('draw', false);
+        setWorkspaceMode('contour');
       }
       setTool(action.tool);
       break;
     }
-    case 'tab':
+    case 'tab': {
       appMenu.selectTab(action.tab, false);
+      const ws = workspaceForTab(action.tab);
+      if (ws) setWorkspaceMode(ws);
       break;
+    }
     case 'transform':
       if (action.mode === 'scale') {
         transformControls.setMode('scale');
-        setStatus('Skalieren — Griffe ziehen (Fusion: S)');
+        setStatus(t('status.scaleGizmo'));
       } else {
         setTransformMode(action.mode);
       }
@@ -4970,7 +5673,7 @@ function applyFusionShortcutAction(action: FusionShortcutAction) {
           updateWorldScanBounds();
           fitCameraToBox(cadScene.bounds);
         }
-        setStatus('Ansicht angepasst (F)');
+        setStatus(t('status.fitView'));
       } else if (action.preset === 'perspective') {
         setView('perspective');
       } else {
@@ -4990,18 +5693,26 @@ function applyFusionShortcutAction(action: FusionShortcutAction) {
       if (activeSketchId) finishSketch();
       break;
     case 'enter-sketch':
-      appMenu.selectTab('sketch', false);
       enterSketchPickMode();
       break;
     case 'toggle-world-local':
       document.getElementById('tmode-world')!.click();
       break;
     case 'cancel':
+      if (isSolidCommandActive()) {
+        cancelAllSolidCommands(solidCommandHosts);
+        setStatus(t('status.solidCommandCancelled'));
+      } else if (isSubtractPicking()) cancelSubtract({ setStatus });
       break;
   }
 }
 
 window.addEventListener('keydown', (e) => {
+  if (!isTypingTarget(e.target) && e.key === 'Enter' && isLoftActive()) {
+    e.preventDefault();
+    void tryCommitLoft(loftHost);
+    return;
+  }
   if (e.key === 'Shift' && !shiftKeyHeld) {
     shiftKeyHeld = true;
     syncOrbitControls();
@@ -5042,6 +5753,9 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
   viewCube.update(delta);
+  if (viewCube.dragging || viewCube.animating) {
+    syncOrbitControlsFromCamera(controls, camera);
+  }
   syncOrbitControls();
   controls.update();
   if (activeSketchId && sketchDimGroup.visible) sketchDims.updateScreenScales();
@@ -5053,19 +5767,70 @@ function animate() {
 initAlignControls();
 
 async function boot() {
+  initI18n();
   resize();
   syncAlignControls();
   renderFusionShortcutsPanel();
   refreshSketchGridUi();
   setupEmptyProjectView();
+  applyScanTheme(bodyDisplayMode, bodyBrightness);
   refreshBrowserPanel();
   updateSketchRibbonState(null, 'sketch-pick');
   refreshHistoryTimeline();
   animate();
+
+  const localeSelect = document.getElementById('locale-select') as HTMLSelectElement | null;
+  if (localeSelect) {
+    if (!localeSelect.options.length) {
+      for (const loc of getLocales()) {
+        const opt = document.createElement('option');
+        opt.value = loc;
+        opt.textContent = localeLabel(loc);
+        localeSelect.appendChild(opt);
+      }
+    }
+    localeSelect.value = getLocale();
+    localeSelect.addEventListener('change', () => setLocale(localeSelect.value as Locale));
+  }
+  onLocaleChange(() => {
+    viewCube.refreshFaceLabels();
+    refreshBrowserPanel();
+    renderFusionShortcutsPanel();
+    syncToolButtons(tool);
+    refreshToolHint();
+    refreshDynamicI18n({ transformLocal: transformSpace === 'local' });
+    sketchDims?.refreshList();
+    syncWorkspaceChrome();
+  });
+
   await initWasm();
+
+  bindSolidFeatureButtons({
+    setStatus,
+    selectTab: (tab) => {
+      appMenu.selectTab(tab, false);
+      const ws = workspaceForTab(tab);
+      if (ws) setWorkspaceMode(ws);
+    },
+    setTool: (next) => setTool(next, { skipWorkspaceCheck: true }),
+    triggerExtrude: () => startSolidCommand('extrude'),
+    triggerRevolve: () => startSolidCommand('revolve'),
+    triggerLoft: () => startSolidCommand('loft'),
+    triggerSplitBody: () => void cutBodyByWorkPlane(),
+    triggerRectPattern: () => void rectangularPatternBodies(),
+    triggerCircPattern: () => void circularPatternBodies(),
+    triggerMirror: () => void mirrorActiveBodyPrompt(),
+    triggerJoin: () => void joinBodiesInComponent(),
+    triggerSubtract: () => beginSubtract({
+      setStatus,
+      getBody: (id) => cadScene.getBody(id),
+      runSubtract: runBooleanSubtract,
+    }),
+  });
+
   appMenu.selectTab('sketch', false);
-  setTool('sketch-pick');
-  setStatus('Leeres Projekt — XY / XZ / YZ Ebene anklicken · oder STL / Projekt laden');
+  setWorkspaceMode('sketch', { tool: 'sketch-pick' });
+  setStatus(t('status.sketchPick'));
 }
 
 boot();

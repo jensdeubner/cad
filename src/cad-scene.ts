@@ -10,6 +10,8 @@ import {
   type ScanAlignment,
 } from './scan-align';
 
+import type { BodyKind } from './body-kind';
+
 export type CadComponentId = string;
 export type CadBodyId = string;
 
@@ -24,6 +26,8 @@ export interface CadBodyRecord {
   id: CadBodyId;
   componentId: CadComponentId;
   label: string;
+  /** Scan, konstruierter Festkörper oder Loft/Negativform */
+  bodyKind: BodyKind;
   /** Mesh-Inhalt (solid / wire / points) — Kind der Komponente */
   meshGroup: THREE.Group;
   /** Freie Lage innerhalb der Komponente (Fusion: Körper bewegen). */
@@ -101,6 +105,7 @@ export class CadScene {
       id: bodyId,
       componentId,
       label,
+      bodyKind: 'scan',
       meshGroup,
       transform: { ...DEFAULT_BODY_TRANSFORM },
       visible: true,

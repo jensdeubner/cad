@@ -4,13 +4,22 @@ import {
   type FloatingPanelDefault,
 } from './floating-panel';
 
-export type FusionTab = 'start' | 'body' | 'align' | 'sketch' | 'draw' | 'view' | 'contours';
+export type FusionTab =
+  | 'start'
+  | 'sketch'
+  | 'solid'
+  | 'body'
+  | 'align'
+  | 'draw'
+  | 'view'
+  | 'contours';
 
 const TAB_PANEL: Record<FusionTab, string> = {
   start: 'panel-start',
+  sketch: 'panel-sketch',
+  solid: 'panel-solid',
   body: 'panel-body',
   align: 'panel-align',
-  sketch: 'panel-sketch',
   draw: 'panel-draw',
   view: 'panel-view',
   contours: 'panel-contours',
@@ -18,9 +27,10 @@ const TAB_PANEL: Record<FusionTab, string> = {
 
 const DEFAULT_LAYOUT: Record<FusionTab, FloatingPanelDefault> = {
   start: { x: 12, y: 12, w: 300, h: 280 },
+  sketch: { x: 24, y: 72, w: 320, h: 300 },
+  solid: { x: 48, y: 48, w: 340, h: 320 },
   body: { x: 48, y: 48, w: 320, h: 420 },
   align: { x: 84, y: 24, w: 400, h: 560 },
-  sketch: { x: 24, y: 72, w: 320, h: 300 },
   draw: { x: 24, y: 72, w: 300, h: 260 },
   view: { x: 360, y: 12, w: 300, h: 300 },
   contours: { x: 360, y: 280, w: 320, h: 380 },
@@ -33,12 +43,13 @@ export class AppMenu {
   constructor(
     private readonly host: HTMLElement,
     private readonly panelCallbacks: Partial<Record<FusionTab, FloatingPanelCallbacks>> = {},
+    private readonly onTabSelect?: (tab: FusionTab) => void,
   ) {
     (Object.keys(TAB_PANEL) as FusionTab[]).forEach((tab) => {
       const el = document.getElementById(TAB_PANEL[tab])!;
       this.panels.set(
         tab,
-        new FloatingPanel(host, el, `scan-tracer.panel.${tab}`, DEFAULT_LAYOUT[tab], panelCallbacks[tab]),
+        new FloatingPanel(host, el, `cad.panel.${tab}`, DEFAULT_LAYOUT[tab], panelCallbacks[tab]),
       );
       el.querySelector('.fp-close')?.addEventListener('click', () => this.closeTab(tab));
     });
@@ -66,6 +77,7 @@ export class AppMenu {
 
   selectTab(tab: FusionTab, togglePanel = false) {
     this.activeTab = tab;
+    this.onTabSelect?.(tab);
     document.querySelectorAll('[data-fusion-tab]').forEach((btn) => {
       btn.classList.toggle('active', (btn as HTMLElement).dataset.fusionTab === tab);
     });

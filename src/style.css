@@ -341,6 +341,64 @@ body {
   font-size: 14px;
 }
 
+.locale-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.locale-switch select {
+  background: #1c2434;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.workspace-mode-label {
+  margin-left: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #c8d8f0;
+  background: rgba(77, 163, 255, 0.14);
+  border: 1px solid rgba(77, 163, 255, 0.28);
+}
+
+.workspace-body .workspace-mode-label {
+  color: #d4e8dc;
+  background: rgba(110, 231, 183, 0.12);
+  border-color: rgba(110, 231, 183, 0.28);
+}
+
+.workspace-contour .workspace-mode-label {
+  color: #f0e6d4;
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.28);
+}
+
+.workspace-sketch [data-fusion-tab="sketch"].active {
+  box-shadow: inset 0 -2px 0 #4da3ff;
+}
+
+.workspace-body [data-fusion-tab="solid"].active,
+.workspace-body [data-fusion-tab="body"].active,
+.workspace-body [data-fusion-tab="align"].active {
+  box-shadow: inset 0 -2px 0 #6ee7b7;
+}
+
+.workspace-contour [data-fusion-tab="draw"].active,
+.workspace-contour [data-fusion-tab="contours"].active {
+  box-shadow: inset 0 -2px 0 #eab308;
+}
+
 .brand-text span {
   display: block;
   color: var(--muted);
@@ -971,6 +1029,21 @@ select {
   color: #7dd3fc;
 }
 
+.browser-tag.browser-tag-kind-scan {
+  color: #86efac;
+  border-color: rgba(134, 239, 172, 0.35);
+}
+
+.browser-tag.browser-tag-kind-solid {
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.35);
+}
+
+.browser-tag.browser-tag-kind-loft {
+  color: #f0abfc;
+  border-color: rgba(240, 171, 252, 0.35);
+}
+
 .browser-tag:where(:not(:empty)) {
   margin-left: 4px;
 }
@@ -1050,6 +1123,7 @@ select {
 .fusion-timeline {
   grid-area: timeline;
   display: flex;
+  flex-direction: column;
   align-items: stretch;
   gap: 0;
   min-height: 44px;
@@ -1057,6 +1131,19 @@ select {
   background: linear-gradient(180deg, #141a26 0%, #0f141d 100%);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+.fusion-timeline.has-features {
+  max-height: 84px;
+}
+
+.timeline-main {
+  display: flex;
+  align-items: stretch;
+  min-height: 44px;
+  max-height: 52px;
+  flex: 1;
+  min-width: 0;
 }
 
 .timeline-toolbar {
@@ -1177,6 +1264,92 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.timeline-features-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.35rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid #3d4a61;
+  border-radius: 6px;
+  background: #1a2233;
+  color: #94a3b8;
+  font-size: 0.68rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.timeline-features-toggle:hover {
+  border-color: var(--accent);
+  color: #e2e8f0;
+}
+
+.timeline-features-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: rgba(77, 163, 255, 0.2);
+  color: #7dd3fc;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.timeline-features {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 3px 8px 5px;
+  border-top: 1px solid var(--border);
+  min-height: 30px;
+}
+
+.timeline-features::-webkit-scrollbar {
+  height: 5px;
+}
+
+.timeline-features::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+.timeline-feature-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid #2e4a6e;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #1a2740 0%, #152238 100%);
+  color: #94a3b8;
+  font-size: 0.68rem;
+}
+
+.timeline-feature-icon {
+  font-weight: 700;
+  color: #7dd3fc;
+}
+
+.timeline-feature-kind {
+  color: #64748b;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.timeline-feature-label {
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #cbd5e1;
 }
 
 #status {

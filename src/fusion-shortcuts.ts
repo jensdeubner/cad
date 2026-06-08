@@ -19,39 +19,35 @@ export interface FusionShortcutContext {
   activeSketchId: string | null;
 }
 
-export interface FusionShortcutEntry {
-  keys: string;
-  action: string;
-  scope: string;
-}
+/** i18n key suffixes for shortcut table rows (see `shortcut.<id>.*` in i18n catalogs). */
+export const FUSION_SHORTCUT_IDS = [
+  's',
+  'l',
+  'c',
+  'r',
+  'a',
+  'd',
+  'e',
+  'esc',
+  'f',
+  'key1',
+  'key2',
+  'key3',
+  'n',
+  'm',
+  'g',
+  'rGizmo',
+  'sScale',
+  'w',
+  'p',
+  'ctrlZ',
+  'ctrlShiftZ',
+  'timeline',
+  'ctrlY',
+  'ctrlS',
+] as const;
 
-/** Fusion-360-nahe Tastenkürzel (Referenz & Hilfe-Panel). */
-export const FUSION_SHORTCUTS: FusionShortcutEntry[] = [
-  { keys: 'S', action: 'Skizze starten / Ebene wählen', scope: 'Global' },
-  { keys: 'L', action: 'Linie', scope: 'Skizze aktiv' },
-  { keys: 'C', action: 'Kreis', scope: 'Skizze aktiv' },
-  { keys: 'R', action: 'Rechteck', scope: 'Skizze aktiv' },
-  { keys: 'A', action: 'Bogen (3 Punkte)', scope: 'Skizze aktiv' },
-  { keys: 'D', action: 'Bemaßung (Kante wählen → Maßlinie ziehen → Wert)', scope: 'Skizze aktiv' },
-  { keys: 'E', action: 'Bearbeiten', scope: 'Skizze aktiv' },
-  { keys: 'Esc', action: 'Abbrechen / Panels schließen', scope: 'Global' },
-  { keys: 'F', action: 'Ansicht anpassen (Fit)', scope: 'Global' },
-  { keys: '1', action: 'Drauf (XY)', scope: 'Ansicht' },
-  { keys: '2', action: 'Vorne (XZ)', scope: 'Ansicht' },
-  { keys: '3', action: 'Seite (YZ)', scope: 'Ansicht' },
-  { keys: 'N', action: 'Navigieren', scope: 'Global' },
-  { keys: 'M', action: 'Körper bewegen', scope: 'Körper' },
-  { keys: 'G', action: 'Gizmo: Verschieben', scope: 'Ausrichten / Körper' },
-  { keys: 'R', action: 'Gizmo: Drehen', scope: 'Ausrichten / Körper' },
-  { keys: 'S', action: 'Gizmo: Skalieren', scope: 'Skalieren-Werkzeug' },
-  { keys: 'W', action: 'Welt / Lokal umschalten', scope: 'Gizmo aktiv' },
-  { keys: 'P', action: 'Press Pull', scope: 'Körper' },
-  { keys: 'Strg+Z', action: 'Rückgängig', scope: 'Global' },
-  { keys: 'Strg+Umschalt+Z', action: 'Wiederholen', scope: 'Global' },
-  { keys: 'Verlauf', action: 'Timeline unten — Schritt anklicken zum Springen', scope: 'Global' },
-  { keys: 'Strg+Y', action: 'Wiederholen', scope: 'Global' },
-  { keys: 'Strg+S', action: 'Projekt speichern', scope: 'Global' },
-];
+export type FusionShortcutId = (typeof FUSION_SHORTCUT_IDS)[number];
 
 function keyLower(e: KeyboardEvent): string {
   return e.key.length === 1 ? e.key.toLowerCase() : e.key;

@@ -77,8 +77,8 @@ function makeOriginPlaneLabel(axis: PlaneAxis, size: number): THREE.Sprite {
   const sprite = new THREE.Sprite(mat);
   sprite.name = `origin-plane-label-${axis}`;
   sprite.renderOrder = 6;
-  const labelScale = size * 0.22;
-  sprite.scale.set(labelScale, labelScale * 0.5, 1);
+  const labelScale = size * 0.3;
+  sprite.scale.set(labelScale, labelScale * 0.48, 1);
   return sprite;
 }
 
@@ -116,8 +116,19 @@ export function makeOriginPlaneGroup(axis: PlaneAxis, size: number): THREE.Group
   return group;
 }
 
+/** Fusion-nahe Kachelgröße für XY/XZ/YZ im Skizzen-Start (kompakt um den Ursprung). */
+export const ORIGIN_PLANE_SCENE_FACTOR = 0.34;
+export const ORIGIN_PLANE_MIN = 52;
+export const ORIGIN_PLANE_MAX = 96;
+
 export function originPlaneSize(sceneSize: number): number {
-  return Math.max(sceneSize * 1.15, 90);
+  const scaled = sceneSize * ORIGIN_PLANE_SCENE_FACTOR;
+  return Math.min(Math.max(scaled, ORIGIN_PLANE_MIN), ORIGIN_PLANE_MAX);
+}
+
+/** Arbeitsraster in der aktiven Skizze — größer als die Ebenen-Kacheln. */
+export function sketchGridExtent(sceneSize: number): number {
+  return Math.max(sceneSize * 0.45, originPlaneSize(sceneSize) * 0.85);
 }
 
 export function viewPresetForSketchAxis(axis: PlaneAxis): 'top' | 'front' | 'side' {

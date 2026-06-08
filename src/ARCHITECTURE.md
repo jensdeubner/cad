@@ -1,4 +1,4 @@
-# CAD Tracer — Source Architecture
+# CAD — Source Architecture
 
 This document describes how the TypeScript codebase is organized and where to add new features.
 

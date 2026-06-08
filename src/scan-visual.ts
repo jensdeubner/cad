@@ -16,24 +16,31 @@ export interface ScanTheme {
   hemiSky: number;
   hemiGround: number;
   hemiIntensity: number;
+  dirIntensity: number;
+  fillIntensity: number;
+  toneExposure: number;
   /** Leicht schattierte Fläche statt flacher Farbe */
   shadedSurface?: boolean;
 }
 
 export const SCAN_THEMES: Record<ScanDisplayMode, ScanTheme> = {
   cad: {
-    background: 0xdce3f0,
-    grid: [0x98a2b8, 0xb8c0d0],
-    solidColor: 0xf4f6fb,
-    solidOpacity: 0.72,
-    edgeColor: 0x1e2a3a,
-    edgeOpacity: 0.92,
-    edgeThreshold: 12,
-    pointOpacity: 0.95,
-    ambient: 0.85,
-    hemiSky: 0xffffff,
-    hemiGround: 0xb0b8c8,
-    hemiIntensity: 0.7,
+    background: 0xe4e6ea,
+    grid: [0x8a9199, 0xb8bcc4],
+    solidColor: 0xc8ccd4,
+    solidOpacity: 1,
+    edgeColor: 0x0f141c,
+    edgeOpacity: 1,
+    edgeThreshold: 18,
+    pointOpacity: 0,
+    ambient: 0.38,
+    hemiSky: 0xf2f3f5,
+    hemiGround: 0x7a8088,
+    hemiIntensity: 0.48,
+    dirIntensity: 1.45,
+    fillIntensity: 0.28,
+    toneExposure: 1.02,
+    shadedSurface: true,
   },
   kontrast: {
     background: 0xc8d0e0,
@@ -48,6 +55,9 @@ export const SCAN_THEMES: Record<ScanDisplayMode, ScanTheme> = {
     hemiSky: 0xffffff,
     hemiGround: 0x909aaa,
     hemiIntensity: 0.8,
+    dirIntensity: 1.2,
+    fillIntensity: 0.45,
+    toneExposure: 1.1,
   },
   /** Geschlossene Dreiecksflächen statt Punkt-Sprites */
   punkte: {
@@ -63,6 +73,9 @@ export const SCAN_THEMES: Record<ScanDisplayMode, ScanTheme> = {
     hemiSky: 0xffffff,
     hemiGround: 0xd0d8e4,
     hemiIntensity: 0.65,
+    dirIntensity: 1.15,
+    fillIntensity: 0.5,
+    toneExposure: 1.15,
     shadedSurface: true,
   },
   flaeche: {
@@ -78,6 +91,9 @@ export const SCAN_THEMES: Record<ScanDisplayMode, ScanTheme> = {
     hemiSky: 0xffffff,
     hemiGround: 0xb0b8c8,
     hemiIntensity: 0.75,
+    dirIntensity: 1.2,
+    fillIntensity: 0.45,
+    toneExposure: 1.1,
     shadedSurface: true,
   },
   dunkel: {
@@ -93,6 +109,9 @@ export const SCAN_THEMES: Record<ScanDisplayMode, ScanTheme> = {
     hemiSky: 0x8898b0,
     hemiGround: 0x1a2030,
     hemiIntensity: 0.5,
+    dirIntensity: 0.95,
+    fillIntensity: 0.35,
+    toneExposure: 0.95,
   },
 };
 
@@ -126,6 +145,36 @@ export function applyNormalColors(geom: THREE.BufferGeometry): void {
     colors[i * 3 + 2] = normals.getZ(i) * 0.5 + 0.5;
   }
   geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
+export function makeScanSolidMaterial(
+  theme: ScanTheme,
+  solidColor: number,
+  opacity: number,
+  useVertexColors: boolean,
+  clippingPlanes: THREE.Plane[],
+): THREE.Material {
+  const opaque = opacity >= 0.98;
+  if (theme.shadedSurface) {
+    return new THREE.MeshLambertMaterial({
+      color: solidColor,
+      vertexColors: useVertexColors,
+      transparent: !opaque,
+      opacity,
+      side: THREE.DoubleSide,
+      clippingPlanes,
+      depthWrite: opaque || opacity > 0.45,
+    });
+  }
+  return new THREE.MeshBasicMaterial({
+    color: solidColor,
+    vertexColors: useVertexColors,
+    transparent: !opaque,
+    opacity,
+    side: THREE.DoubleSide,
+    clippingPlanes,
+    depthWrite: opaque || opacity > 0.5,
+  });
 }
 
 export function brightenColor(hex: number, amount: number): number {

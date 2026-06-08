@@ -4,8 +4,34 @@
  */
 import * as THREE from 'three';
 import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { t } from '../i18n';
 import type { Tool } from '../types';
+import { isSolidCommandActive } from '../solid-command';
 import { bodyGizmoTool, meshSculptTool } from '../tools/helpers';
+
+const _yUp = new THREE.Vector3(0, 1, 0);
+const _offset = new THREE.Vector3();
+
+type OrbitControlsInternals = OrbitControls & {
+  _quat: THREE.Quaternion;
+  _quatInverse: THREE.Quaternion;
+  _spherical: THREE.Spherical;
+  _sphericalDelta: THREE.Spherical;
+};
+
+/** Resync OrbitControls after the camera was moved externally (ViewCube orbit/flight). */
+export function syncOrbitControlsFromCamera(
+  controls: OrbitControls,
+  camera: THREE.PerspectiveCamera,
+): void {
+  const c = controls as OrbitControlsInternals;
+  _offset.copy(camera.position).sub(controls.target);
+  c._quat.setFromUnitVectors(camera.up, _yUp);
+  c._quatInverse.copy(c._quat).invert();
+  _offset.applyQuaternion(c._quat);
+  c._spherical.setFromVector3(_offset);
+  c._sphericalDelta.set(0, 0, 0);
+}
 
 export type ViewportNavState = {
   tool: Tool;
@@ -17,8 +43,9 @@ export type ViewportNavState = {
   draggingPlane: boolean;
 };
 
-export const SKETCH_VIEWPORT_NAV_HINT =
-  'Mausrad=Zoom · Mitte=Schwenken · Umschalt+Mitte=Drehen · Links=Werkzeug';
+export function getSketchViewportNavHint(): string {
+  return t('viewport.navHint');
+}
 
 function isSketchViewportContext(tool: Tool, activeSketchId: string | null): boolean {
   return (
@@ -55,7 +82,7 @@ export function applyViewportNavigation(controls: OrbitControls, state: Viewport
     return;
   }
 
-  if (sketch || meshSculptTool(state.tool)) {
+  if (sketch || meshSculptTool(state.tool) || isSolidCommandActive()) {
     controls.mouseButtons = {
       LEFT: nullMouse,
       MIDDLE: middle,

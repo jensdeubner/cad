@@ -6,6 +6,7 @@
  *   4. Double-click label → edit value
  */
 import * as THREE from 'three';
+import { t } from '../i18n';
 import type { Contour } from '../types';
 import {
   applyDimensionValueToContour,
@@ -169,8 +170,8 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
     rebuildPreview();
     setStatus(
       editing
-        ? `Maß an der Linie bearbeiten · Wert eingeben · Enter oder OK`
-        : `Maß an der Linie · Wert eingeben (oder unten) · aktuell ${formatSketchLength(mm, unit, dimSession.edge.kind)}`,
+        ? t('status.dimEdit')
+        : t('status.dimValue', { value: formatSketchLength(mm, unit, dimSession.edge.kind) }),
     );
   }
 
@@ -301,12 +302,16 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
     rebuild();
     refreshList();
     const unit = host.getSketchUnit();
-    setStatus(`Bemaßung: ${formatSketchLength(sketchLengthMm(dim.a, dim.b), unit, dim.kind)}`);
+    setStatus(
+      t('status.dimSet', {
+        value: formatSketchLength(sketchLengthMm(dim.a, dim.b), unit, dim.kind),
+      }),
+    );
   }
 
   function deleteDimension(id: string) {
     if (!host.getSketchDimensions().some((d) => d.id === id)) return;
-    host.pushUndo('Bemaßung löschen');
+    host.pushUndo(t('undo.dimDelete'));
     host.setSketchDimensions(host.getSketchDimensions().filter((d) => d.id !== id));
     if (selectedDimensionId === id) selectedDimensionId = null;
     if (dimSession?.editingId === id) {
@@ -317,7 +322,7 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
     }
     rebuild();
     refreshList();
-    setStatus('Bemaßung gelöscht');
+    setStatus(t('status.dimDeleted'));
   }
 
   function selectDimension(dim: SketchDimension | null) {
@@ -326,7 +331,9 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
     if (dim) {
       const unit = host.getSketchUnit();
       setStatus(
-        `Bemaßung gewählt: ${formatSketchLength(sketchLengthMm(dim.a, dim.b), unit, dim.kind)} · Entf löschen · Doppelklick bearbeiten`,
+        t('status.dimSelected', {
+          value: formatSketchLength(sketchLengthMm(dim.a, dim.b), unit, dim.kind),
+        }),
       );
     }
   }
@@ -357,10 +364,10 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
       const li = document.createElement('li');
       const label = document.createElement('span');
       label.textContent = `${i + 1}. ${formatSketchLength(mm, unit, d.kind)}`;
-      label.title = 'Doppelklick im 3D-Fenster auf Maßzahl zum Bearbeiten';
+      label.title = t('panel.sketch.dimListEdit');
       const del = document.createElement('button');
       del.type = 'button';
-      del.title = 'Bemaßung löschen';
+      del.title = t('panel.sketch.dimDelete');
       del.textContent = '×';
       del.onclick = () => deleteDimension(d.id);
       li.appendChild(label);
@@ -387,12 +394,12 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
   function beginEditDimension(dim: SketchDimension) {
     const contour = host.getContours().find((c) => c.id === dim.contourId);
     if (!contour) {
-      setStatus('Profil der Bemaßung nicht gefunden');
+      setStatus(t('status.dimProfileNotFound'));
       return;
     }
     const edge = edgeFromContour(contour, dim);
     if (!edge) {
-      setStatus('Bemaßung konnte nicht geladen werden');
+      setStatus(t('status.dimLoadFailed'));
       return;
     }
     dimSession = {
@@ -414,10 +421,12 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
     if (edge) {
       const unit = host.getSketchUnit();
       setStatus(
-        `Kante (${formatSketchLength(sketchLengthMm(edge.a, edge.b), unit, edge.kind)}) — klicken, Maßlinie ziehen, Wert eingeben`,
+        t('status.dimEdgeHover', {
+          value: formatSketchLength(sketchLengthMm(edge.a, edge.b), unit, edge.kind),
+        }),
       );
     } else if (!dimSession) {
-      setStatus('Bemaßung: Linie oder Kreis anfahren · Kante klicken · Doppelklick auf Maßzahl = bearbeiten');
+      setStatus(t('status.dimHint'));
     }
   }
 
@@ -460,7 +469,9 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
       setHoveredEdge(edge);
       const unit = host.getSketchUnit();
       setStatus(
-        `Kante gewählt (${formatSketchLength(sketchLengthMm(edge.a, edge.b), unit, edge.kind)}) — D drücken, Maßlinie ziehen`,
+        t('status.dimEdgeSelected', {
+          value: formatSketchLength(sketchLengthMm(edge.a, edge.b), unit, edge.kind),
+        }),
       );
       return true;
     },
@@ -480,7 +491,7 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
       };
       setHoveredEdge(edge);
       rebuildPreview();
-      setStatus('Maßlinie vom Strich wegziehen · Loslassen · Wert erscheint an der Linie');
+      setStatus(t('status.dimDragLine'));
     },
 
     finishDrag() {
@@ -531,7 +542,7 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
     handlePointerDown(e, capture) {
       const activeSketchId = host.getActiveSketchId();
       if (!activeSketchId) {
-        setStatus('Zuerst eine Skizze auf XY / XZ / YZ starten');
+        setStatus(t('status.dimNeedSketch'));
         return false;
       }
 
@@ -607,19 +618,19 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
       if (!dimSession || dimSession.phase !== 'value' || !activeSketchId) return;
       const targetDisplayMm = parseUserDimensionValue(currentDimValueText(), host.getSketchUnit());
       if (targetDisplayMm === null) {
-        setStatus('Ungültiger Wert — positive Zahl in mm/cm eingeben');
+        setStatus(t('status.dimInvalidValue'));
         return;
       }
       const contour = host.getContours().find((c) => c.id === dimSession!.edge.contourId);
       if (!contour) {
-        setStatus('Profil nicht gefunden');
+        setStatus(t('status.dimProfileMissing'));
         this.clearSession();
         return;
       }
-      host.pushUndo(dimSession.editingId ? 'Bemaßung bearbeiten' : 'Bemaßung setzen');
+      host.pushUndo(dimSession.editingId ? t('undo.dimEdit') : t('undo.dimSet'));
       const edge = dimSession.edge;
       if (!applyDimensionValueToContour(contour, edge, targetDisplayMm)) {
-        setStatus('Bemaßung konnte nicht angewendet werden');
+        setStatus(t('status.dimApplyFailed'));
         return;
       }
       edge.a.copy(contour.points[edge.pointIndex0]);
@@ -642,7 +653,9 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
           refreshList();
           const unit = host.getSketchUnit();
           setStatus(
-            `Bemaßung aktualisiert: ${formatSketchLength(sketchLengthMm(edge.a, edge.b), unit, edge.kind)}`,
+            t('status.dimUpdated', {
+              value: formatSketchLength(sketchLengthMm(edge.a, edge.b), unit, edge.kind),
+            }),
           );
         }
         this.clearSession();

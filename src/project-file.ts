@@ -1,3 +1,4 @@
+import { inferBodyKindFromLabel, type BodyKind } from './body-kind';
 import type { BodyTransform } from './cad-scene';
 import { DEFAULT_BODY_ID, DEFAULT_COMPONENT_ID, type CadBodyId, type CadComponentId } from './cad-scene';
 import { migrateContourAttachment } from './contour-body';
@@ -5,7 +6,9 @@ import type { SketchDimensionKind, SketchUnit } from './sketch-dimension';
 import type { ContourPointType, PlaneAxis } from './types';
 
 export const PROJECT_EXTENSION = '.stpr';
-export const PROJECT_VERSION = 4;
+export const PROJECT_VERSION = 6;
+
+export type { BodyKind };
 
 export interface ProjectHandle {
   in: [number, number, number];
@@ -56,6 +59,7 @@ export interface ProjectBody {
   id: CadBodyId;
   label: string;
   displayStride: number;
+  bodyKind?: BodyKind;
   /** Freie Körperlage innerhalb der Komponente */
   transform?: BodyTransform;
   /** Festkörper-Füllfarbe (Nachzeichnen), z. B. "#c4ccd8" */
@@ -155,6 +159,32 @@ function migrateV1(data: ProjectMeta): ProjectMeta {
   });
 }
 
+function ensureBodyKinds(data: ProjectMeta): ProjectMeta {
+  return {
+    ...data,
+    version: PROJECT_VERSION,
+    components: data.components.map((c) => ({
+      ...c,
+      bodies: c.bodies.map((b) => ({
+        ...b,
+        bodyKind: b.bodyKind ?? inferBodyKindFromLabel(b.label),
+      })),
+    })),
+  };
+}
+
+function migrateV4(data: ProjectMeta): ProjectMeta {
+  return migrateV6(ensureBodyKinds({ ...data, version: 5 }));
+}
+
+function migrateV5(data: ProjectMeta): ProjectMeta {
+  return migrateV6(ensureBodyKinds({ ...data, version: 5 }));
+}
+
+function migrateV6(data: ProjectMeta): ProjectMeta {
+  return { ...ensureBodyKinds(data), version: PROJECT_VERSION };
+}
+
 function migrateV2(data: ProjectMeta): ProjectMeta {
   const bodies = (data.bodies ?? []).map((b) => ({
     id: b.id,
@@ -166,8 +196,8 @@ function migrateV2(data: ProjectMeta): ProjectMeta {
     (data.bodies?.[0] as { alignment?: BodyTransform })?.alignment ??
     data.alignment ?? { rotX: 0, rotY: 0, rotZ: 0, posX: 0, posY: 0, posZ: 0 };
   const compLabel = data.components?.[0]?.label ?? 'Komponente 1';
-  return {
-    version: PROJECT_VERSION,
+  return migrateV4({
+    version: 4,
     activeComponentId: data.activeComponentId ?? DEFAULT_COMPONENT_ID,
     activeBodyId: data.activeBodyId ?? bodies[0]?.id ?? DEFAULT_BODY_ID,
     components: [
@@ -182,23 +212,27 @@ function migrateV2(data: ProjectMeta): ProjectMeta {
     planePosition: data.planePosition,
     hitTolerance: data.hitTolerance,
     contours: (data.contours ?? []).map(normalizeContour),
-  };
+  });
 }
 
 export function parseProjectMeta(json: string): ProjectMeta {
   const data = JSON.parse(json) as ProjectMeta;
   if (!data) throw new Error('Projektdatei ungültig');
-  if (data.version === 1) return migrateV1(data);
-  if (data.version === 2) return migrateV2(data);
-  if (data.version !== PROJECT_VERSION) throw new Error('Unbekannte Projektversion');
-  if (!Array.isArray(data.contours)) {
+  let meta: ProjectMeta;
+  if (data.version === 1) meta = migrateV1(data);
+  else if (data.version === 2) meta = migrateV2(data);
+  else if (data.version === 4) meta = migrateV4(data);
+  else if (data.version === 5) meta = migrateV5(data);
+  else if (data.version === PROJECT_VERSION) meta = migrateV6(data);
+  else throw new Error('Unbekannte Projektversion');
+  if (!Array.isArray(meta.contours)) {
     throw new Error('Projektdatei unvollständig (Konturen fehlen)');
   }
-  if (!Array.isArray(data.components) || !data.components.length) {
+  if (!Array.isArray(meta.components) || !meta.components.length) {
     throw new Error('Projektdatei unvollständig (Komponenten fehlen)');
   }
   return {
-    ...data,
-    contours: data.contours.map(normalizeContour),
+    ...meta,
+    contours: meta.contours.map(normalizeContour),
   };
 }

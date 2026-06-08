@@ -1,3 +1,4 @@
+mod boolean;
 mod project;
 
 use js_sys::Float32Array;
@@ -26,6 +27,30 @@ struct Contour {
 struct LoftRequest {
     contours: Vec<Contour>,
     closed_ends: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct RevolveRequest {
+    contour: Contour,
+    /// Revolution axis through world origin: "x" | "y" | "z"
+    #[serde(default = "default_revolve_axis")]
+    revolution_axis: String,
+    #[serde(default = "default_revolve_segments")]
+    segments: u32,
+    #[serde(default = "default_revolve_angle")]
+    angle_deg: f32,
+}
+
+fn default_revolve_axis() -> String {
+    "z".to_string()
+}
+
+fn default_revolve_segments() -> u32 {
+    48
+}
+
+fn default_revolve_angle() -> f32 {
+    360.0
 }
 
 #[wasm_bindgen]
@@ -169,6 +194,95 @@ pub fn loft_contours_json(json: &str) -> Result<ParsedMesh, JsValue> {
     let req: LoftRequest =
         serde_json::from_str(json).map_err(|e| JsValue::from_str(&e.to_string()))?;
     loft_contours(req)
+}
+
+#[wasm_bindgen]
+pub fn revolve_contour_json(json: &str) -> Result<ParsedMesh, JsValue> {
+    let req: RevolveRequest =
+        serde_json::from_str(json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    revolve_contour(req)
+}
+
+fn revolution_axis_for_plane(axis: &str) -> &'static str {
+    match axis {
+        "xy" => "z",
+        "xz" => "y",
+        _ => "x",
+    }
+}
+
+fn rotate_around_axis(v: &Vec3, axis: &str, theta: f32) -> [f32; 3] {
+    let (x, y, z) = (v.x, v.y, v.z);
+    let (c, s) = (theta.cos(), theta.sin());
+    match axis {
+        "x" => [x, y * c - z * s, y * s + z * c],
+        "y" => [x * c + z * s, y, -x * s + z * c],
+        _ => [x * c - y * s, x * s + y * c, z],
+    }
+}
+
+fn revolve_contour(req: RevolveRequest) -> Result<ParsedMesh, JsValue> {
+    let contour = &req.contour;
+    if !contour.closed || contour.points.len() < 3 {
+        return Err(JsValue::from_str(
+            "Geschlossenes Profil mit mindestens 3 Punkten nötig",
+        ));
+    }
+
+    let ring: Vec<Vec3> = contour
+        .points
+        .iter()
+        .map(|p| {
+            if contour.full_3d {
+                Vec3 {
+                    x: p[0],
+                    y: p[1],
+                    z: p[2],
+                }
+            } else {
+                project_to_plane(p, &contour.axis, contour.position)
+            }
+        })
+        .collect();
+
+    let n = ring.len().clamp(3, 96);
+    let uniform = resample_arclength(&ring, n);
+    let segs = req.segments.max(12).min(128);
+    let total_angle = req.angle_deg.to_radians();
+    let axis = if req.revolution_axis.is_empty() {
+        revolution_axis_for_plane(&contour.axis)
+    } else {
+        req.revolution_axis.as_str()
+    };
+
+    let mut positions = Vec::with_capacity((segs as usize + 1) * n * 3);
+    let mut indices = Vec::new();
+
+    for s in 0..=segs {
+        let theta = total_angle * s as f32 / segs as f32;
+        for v in &uniform {
+            positions.extend_from_slice(&rotate_around_axis(v, axis, theta));
+        }
+    }
+
+    let ring_verts = n as u32;
+    for s in 0..segs {
+        for i in 0..n {
+            let i2 = ((i + 1) % n) as u32;
+            let i = i as u32;
+            let a = s * ring_verts + i;
+            let b = s * ring_verts + i2;
+            let c = (s + 1) * ring_verts + i2;
+            let d = (s + 1) * ring_verts + i;
+            indices.extend_from_slice(&[a, b, c, a, c, d]);
+        }
+    }
+
+    Ok(ParsedMesh {
+        triangle_count: (indices.len() / 3) as u32,
+        positions,
+        indices,
+    })
 }
 
 fn project_to_plane(p: &[f32; 3], axis: &str, position: f32) -> Vec3 {
@@ -457,20 +571,58 @@ pub fn pack_project(meta_json: &str, stl_data: &[u8]) -> Result<Vec<u8>, JsValue
 }
 
 #[wasm_bindgen]
+pub fn pack_project_multi(meta_json: &str, mesh_archive: &[u8]) -> Result<Vec<u8>, JsValue> {
+    project::pack_multi(meta_json, mesh_archive).map_err(Into::into)
+}
+
+#[wasm_bindgen]
 pub fn unpack_project(data: &[u8]) -> Result<JsValue, JsValue> {
-    let (meta, stl) = project::unpack(data).map_err(|e: project::ProjectError| JsValue::from(e))?;
-    // Uint8Array statt serde-Array — große STLs (>~50 MB) sonst RangeError im Browser
+    let unpacked = project::unpack(data).map_err(|e: project::ProjectError| JsValue::from(e))?;
     let obj = js_sys::Object::new();
-    js_sys::Reflect::set(&obj, &JsValue::from_str("meta"), &JsValue::from_str(&meta))
-        .map_err(|e| JsValue::from_str(&format!("meta: {e:?}")))?;
-    js_sys::Reflect::set(
-        &obj,
-        &JsValue::from_str("stl"),
-        &js_sys::Uint8Array::from(stl.as_slice()),
-    )
-    .map_err(|e| JsValue::from_str(&format!("stl: {e:?}")))?;
+    match unpacked {
+        project::UnpackResult::Legacy { meta, stl } => {
+            js_sys::Reflect::set(&obj, &JsValue::from_str("meta"), &JsValue::from_str(&meta))
+                .map_err(|e| JsValue::from_str(&format!("meta: {e:?}")))?;
+            js_sys::Reflect::set(&obj, &JsValue::from_str("format"), &JsValue::from_str("v1"))
+                .map_err(|e| JsValue::from_str(&format!("format: {e:?}")))?;
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("stl"),
+                &js_sys::Uint8Array::from(stl.as_slice()),
+            )
+            .map_err(|e| JsValue::from_str(&format!("stl: {e:?}")))?;
+        }
+        project::UnpackResult::Multi { meta, bodies } => {
+            js_sys::Reflect::set(&obj, &JsValue::from_str("meta"), &JsValue::from_str(&meta))
+                .map_err(|e| JsValue::from_str(&format!("meta: {e:?}")))?;
+            js_sys::Reflect::set(&obj, &JsValue::from_str("format"), &JsValue::from_str("v2"))
+                .map_err(|e| JsValue::from_str(&format!("format: {e:?}")))?;
+            let arr = js_sys::Array::new();
+            for entry in bodies {
+                let item = js_sys::Object::new();
+                js_sys::Reflect::set(
+                    &item,
+                    &JsValue::from_str("id"),
+                    &JsValue::from_str(&entry.id),
+                )
+                .map_err(|e| JsValue::from_str(&format!("id: {e:?}")))?;
+                js_sys::Reflect::set(
+                    &item,
+                    &JsValue::from_str("stl"),
+                    &js_sys::Uint8Array::from(entry.stl.as_slice()),
+                )
+                .map_err(|e| JsValue::from_str(&format!("stl: {e:?}")))?;
+                arr.push(&item);
+            }
+            js_sys::Reflect::set(&obj, &JsValue::from_str("bodies"), &arr)
+                .map_err(|e| JsValue::from_str(&format!("bodies: {e:?}")))?;
+        }
+    }
     Ok(obj.into())
 }
+
+pub use boolean::mesh_boolean_subtract_json;
+pub use boolean::mesh_boolean_union_json;
 
 fn normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> [f32; 3] {
     let ux = b[0] - a[0];

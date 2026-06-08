@@ -9,6 +9,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "boolmesh"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ede2e53d77b54cd1aae2a8641693c4c65b0ecd0d423194ca4ef78278b53313a"
+dependencies = [
+ "glam",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -62,6 +71,12 @@ dependencies = [
  "pin-project-lite",
  "slab",
 ]
+
+[[package]]
+name = "glam"
+version = "0.30.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19fc433e8437a212d1b6f1e68c7824af3aed907da60afa994e7f542d18d12aa9"
 
 [[package]]
 name = "itoa"
@@ -265,6 +280,7 @@ dependencies = [
 name = "wasm-stl"
 version = "0.1.0"
 dependencies = [
+ "boolmesh",
  "flate2",
  "js-sys",
  "serde",
