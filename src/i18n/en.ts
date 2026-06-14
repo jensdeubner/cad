@@ -873,6 +873,11 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/mirror-plane ──
+  'solid.mirrorPlane': 'Mirror (Plane)',
+  'solid.mirrorPlaneBody': 'Mirror',
+  'status.mirrorPlaneDone': 'Mirrored body created (XZ plane)',
+  'status.mirrorPlaneNoBody': 'No active body — load or create geometry first',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'Export OBJ',

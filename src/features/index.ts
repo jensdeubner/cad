@@ -15,6 +15,7 @@ import './io-obj-export';
 import './construct-axis-point';
 import './solid-sweep';
 import './nav-views';
+import './solid-mirror-plane';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
