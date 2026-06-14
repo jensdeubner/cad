@@ -8,6 +8,7 @@
  */
 import './solid-primitives';
 import './inspect-model-stats';
+import './mesh-reverse-normal';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

@@ -887,4 +887,9 @@ export const de: Record<string, string> = {
   'inspect.stats': 'Statistik',
   'inspect.stats.noBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   'status.statsDone': 'Vol {{vol}} mm³ · Fläche {{area}} mm²',
+  // ── Reverse Normal (Mesh) ──
+  'mesh.normals': 'Normalen',
+  'mesh.reverseNormal': 'Normalen umkehren',
+  'status.reverseNormalDone': 'Normalen umgekehrt — Wicklung gespiegelt',
+  'status.reverseNormalNoBody': 'Kein aktiver Körper — zuerst Geometrie laden',
 };

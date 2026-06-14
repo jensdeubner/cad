@@ -886,4 +886,9 @@ export const en: Record<string, string> = {
   'inspect.stats': 'Statistics',
   'inspect.stats.noBody': 'No active body — load geometry or create a primitive first',
   'status.statsDone': 'Vol {{vol}} mm³ · Area {{area}} mm²',
+  // ── Reverse Normal (Mesh) ──
+  'mesh.normals': 'Normals',
+  'mesh.reverseNormal': 'Reverse Normal',
+  'status.reverseNormalDone': 'Normals reversed — winding flipped',
+  'status.reverseNormalNoBody': 'No active body — load geometry first',
 };
