@@ -961,4 +961,9 @@ export const en: Record<string, string> = {
   'inspect.com': 'Center of Mass',
   'status.comDone': 'Center of mass: ({{x}}, {{y}}, {{z}})',
   'status.comNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/duplicate-body: Duplicate body ──
+  'solid.duplicate': 'Duplicate',
+  'solid.duplicateBody': 'Copy',
+  'status.duplicateDone': 'Body duplicated — copy inserted with offset',
+  'status.duplicateNoBody': 'No active body — load geometry or create a primitive first',
 };
