@@ -921,4 +921,10 @@ export const en: Record<string, string> = {
   'status.viewSaved': 'View saved',
   'status.viewRestored': 'View restored',
   'status.noSavedView': 'No saved view — use "Save View" first',
+  // ── feat/intersect: Intersect + interference ──
+  'solid.intersectBody': 'Intersection',
+  'status.intersectDone': 'Intersection created',
+  'status.intersectEmpty': 'Intersection empty — bodies do not overlap',
+  'inspect.interference': 'Interference',
+  'status.interferenceDone': 'Interference checked — overlap {{volume}} mm³',
 };

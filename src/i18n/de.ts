@@ -922,4 +922,10 @@ export const de: Record<string, string> = {
   'status.viewSaved': 'Ansicht gespeichert',
   'status.viewRestored': 'Ansicht geladen',
   'status.noSavedView': 'Keine gespeicherte Ansicht — zuerst „Ansicht speichern“',
+  // ── feat/intersect: Schneiden + Interferenz ──
+  'solid.intersectBody': 'Schnittmenge',
+  'status.intersectDone': 'Schnittmenge erstellt',
+  'status.intersectEmpty': 'Schnittmenge leer — Körper überlappen sich nicht',
+  'inspect.interference': 'Interferenz',
+  'status.interferenceDone': 'Interferenz geprüft — Überlappung {{volume}} mm³',
 };
