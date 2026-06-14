@@ -874,6 +874,11 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/pattern-rect: Rechteckmuster ──
+  'solid.patternGrid': 'Rechteckmuster',
+  'solid.patternGridBody': 'Muster',
+  'status.patternGridDone': 'Rechteckmuster erstellt: {{count}} Kopien',
+  'status.patternGridNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
   // ── feat/bbox-body: Begrenzungsrahmen-Körper ──
   'solid.bboxBody': 'Begrenzungsrahmen',
   'status.bboxBodyDone': 'Begrenzungsrahmen-Körper erstellt',
