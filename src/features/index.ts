@@ -26,6 +26,7 @@ import './solid-mirror-plane';
 import './view-visibility';
 import './view-isolate';
 import './solid-duplicate';
+import './solid-bbox-body';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
