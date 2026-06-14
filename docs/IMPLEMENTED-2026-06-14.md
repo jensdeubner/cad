@@ -1,8 +1,8 @@
 # Umgesetzt: Fusion-Parität via Parallel-Agenten (2026-06-14)
 
 Ausführung des Plans aus `docs/PARALLEL-AGENTS-FUSION-PARITY.md` mit dem Backlog aus
-`docs/FUSION-360-PARITY.md`. Ergebnis auf **`main`** (PR0 + **24 Features** in 3 Wellen),
-durchgängig grün: `typecheck`, `vitest` (**1009**), `npm run build`, und **46/46 Playwright-E2E**
+`docs/FUSION-360-PARITY.md`. Ergebnis auf **`main`** (PR0 + **33 Features** in 4 Wellen + #16),
+durchgängig grün: `typecheck`, `vitest` (**1053**), `npm run build`, und **60/60 Playwright-E2E**
 über alle Features (DE+EN, null Konsolenfehler).
 
 ## PR0 — Feature-Registry-Seam (Fundament)
@@ -49,6 +49,15 @@ Neuer Entkopplungs-Seam, damit Features sich selbst registrieren statt `main.ts`
 | Sichtbarkeit umschalten | `view/visibility.ts` | #8 (Object Visibility) |
 | Isolieren | `view/isolate.ts` | #8 (Isolate) |
 | Kanten-Anzeige | `render/edge-display.ts` | Visual Styles (Edges) |
+| Rechteckmuster (N×M) | `solid/pattern-rect.ts` | Rectangular Pattern |
+| Mesh unterteilen (×4) | `mesh/subdivide.ts` | Mesh density |
+| Laplace-Glättung | `mesh/smooth.ts` | Smooth (Mesh) |
+| Auf Boden setzen | `solid/drop-floor.ts` | Align-to-floor |
+| Auf Größe skalieren | `solid/scale-to-size.ts` | Scale |
+| Ebenenschnitt | `solid/plane-cut.ts` | Plane Cut |
+| Hüllkugel-Körper | `solid/sphere-body.ts` | Stock/Sphere |
+| PLY-Export | `io/ply-export.ts` | #25 (Teil) |
+| **Offset-Konstruktionsebene** | `construct/plane.ts` (+ `host.startSketch`) | **#16** |
 
 Alle Solid-Operationen sind **rein TypeScript** umgesetzt (Intersect komponiert den vorhandenen
 `mesh_boolean_subtract_json`-Kernel als `A∩B = A−(A−B)`), daher kein neuer Rust-Code und keine
@@ -56,11 +65,13 @@ Alle Solid-Operationen sind **rein TypeScript** umgesetzt (Intersect komponiert 
 
 ## Prozess
 
-PR0 solo → **3 Wellen à 8 Agenten** in **isolierten git-Worktrees** (eigener Branch + Vite-Port),
+PR0 solo → **4 Wellen à 8 Agenten** in **isolierten git-Worktrees** (eigener Branch + Vite-Port),
 jeder mit Pflicht-DoD (typecheck + vitest + eigener E2E grün, 0 Konsolenfehler, DE+EN). Serielle
-Integration via `merge=union` (alle Append-Marker konfliktfrei). Abschluss: zwei adversariale
-Multi-Agent-Reviews → 13 verifizierte Funde gefixt (GPU-Dispose-Leaks, uncatchbare WASM-Throws,
-ConvexGeometry-/Null-Crash-Pfade, Overlay-Idempotenz), je mit Regressions-Test belegt.
+Integration via `merge=union` (alle Append-Marker konfliktfrei). #16 als koordinierter Kern-Eingriff
+(schmale `host.startSketch`-Erweiterung). Abschluss: drei adversariale Multi-Agent-Reviews →
+~19 verifizierte Funde gefixt (GPU-Dispose-Leaks, uncatchbare WASM-Throws, ConvexGeometry-/Null-
+Crash-Pfade, plane-cut NaN-Normalen, Overlay-Idempotenz, drop-floor Bounds/Undo), je mit
+Regressions-Test belegt.
 
 ## Bekannte Grenzen (dokumentiert, bewusst)
 
@@ -70,8 +81,8 @@ ConvexGeometry-/Null-Crash-Pfade, Overlay-Idempotenz), je mit Regressions-Test b
 - **Intersect auf einem Boolean-Ergebnis** kann den WASM-Kernel in einen Trap (`unreachable`)
   führen; der `try/catch` fängt den Fehler ab (Status statt Absturz), aber das Modul kann danach
   einen Re-Init brauchen. Für saubere Operanden (Normalfall) robust.
-- Konstruktions-Ebene (#16), Sketch-Constraint-Solver (#11), parametrisches Timeline-Replay (#30)
-  bleiben offen (Welle-2-Plan B / tief verzahnt).
+- Sketch-Constraint-Solver (#11) und parametrisches Timeline-Replay (#30) bleiben offen —
+  tief im Sketch-/Feature-Kern verzahnt, eigenes koordiniertes Vorhaben (nicht naiv-parallelisierbar).
 
 ## Neues Feature hinzufügen
 
