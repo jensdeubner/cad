@@ -890,6 +890,10 @@ export const en: Record<string, string> = {
   'solid.scaleToSize': 'Scale to Size',
   'status.scaleToSizeDone': 'Scaled to target size (largest edge 50 mm)',
   'status.scaleToSizeNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/sphere-body: Bounding sphere body ──
+  'solid.sphereBody': 'Bounding Sphere',
+  'status.sphereBodyDone': 'Bounding sphere body created',
+  'status.sphereBodyNoBody': 'No active body — load geometry or create a primitive first',
   // ── feat/bbox-body: Bounding Box body ──
   'solid.bboxBody': 'Bounding Box',
   'status.bboxBodyDone': 'Bounding box body created',

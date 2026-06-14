@@ -37,6 +37,7 @@ import './mesh-smooth';
 import './solid-drop-floor';
 import './solid-scale-to-size';
 import './solid-plane-cut';
+import './solid-sphere-body';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
