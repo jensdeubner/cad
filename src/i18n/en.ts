@@ -873,6 +873,15 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/named-views: multi-slot custom named views ──
+  'view.namedSave': 'Remember view',
+  'view.namedRestore': 'Last view',
+  'view.namedSlot': 'View {{n}}',
+  'view.namedDelete': 'Delete',
+  'panel.namedViews.title': 'Custom views',
+  'status.namedViewSaved': 'View "{{name}}" saved ({{count}} total)',
+  'status.namedViewRestored': 'View "{{name}}" restored',
+  'status.namedViewNone': 'No saved views',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',
