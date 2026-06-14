@@ -873,6 +873,10 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/bbox-body: Bounding Box body ──
+  'solid.bboxBody': 'Bounding Box',
+  'status.bboxBodyDone': 'Bounding box body created',
+  'status.bboxBodyNoBody': 'No active body — load geometry or create a primitive first',
   // ── feat/weld: Make Closed / Weld ──
   'mesh.repair': 'Repair',
   'mesh.weld': 'Weld',
