@@ -877,6 +877,10 @@ export const en: Record<string, string> = {
   'solid.bboxBody': 'Bounding Box',
   'status.bboxBodyDone': 'Bounding box body created',
   'status.bboxBodyNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/edge-display: Show Edges (Shaded with Edges) ──
+  'view.edges': 'Edges',
+  'status.edgesOn': 'Edges shown',
+  'status.edgesOff': 'Edges hidden',
   // ── feat/weld: Make Closed / Weld ──
   'mesh.repair': 'Repair',
   'mesh.weld': 'Weld',

@@ -30,6 +30,7 @@ import './solid-bbox-body';
 import './solid-convex-hull';
 import './solid-scale-factor';
 import './io-obj-import';
+import './render-edge-display';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

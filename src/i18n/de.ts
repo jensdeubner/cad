@@ -878,6 +878,10 @@ export const de: Record<string, string> = {
   'solid.bboxBody': 'Begrenzungsrahmen',
   'status.bboxBodyDone': 'Begrenzungsrahmen-Körper erstellt',
   'status.bboxBodyNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/edge-display: Kanten anzeigen (Shaded with Edges) ──
+  'view.edges': 'Kanten',
+  'status.edgesOn': 'Kanten eingeblendet',
+  'status.edgesOff': 'Kanten ausgeblendet',
   // ── feat/weld: Make Closed / Verschweißen ──
   'mesh.repair': 'Reparatur',
   'mesh.weld': 'Verschweißen',
