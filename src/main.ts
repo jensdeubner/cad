@@ -200,6 +200,11 @@ import {
   withRecipe,
   cloneFeatureRecipe,
 } from './feature-recipe';
+import {
+  recomputeFeature,
+  type RecomputeDeps,
+  type RecomputeStatus,
+} from './feature-recompute';
 import { bindHistoryTimeline } from './history-timeline';
 import { UndoHistory, captureSnapshot } from './undo';
 import { bindSolidFeatureButtons } from './solid-features';
@@ -452,6 +457,77 @@ function recordSolidFeature(kind: FeatureKind, label: string, bodyId?: string) {
   // appendFeature moves the marker to the end, so re-apply (clears any prior
   // rollback suppression now that a fresh feature is active).
   applyTimelineMarker();
+}
+
+/**
+ * #30 Phase 2: re-execute a body's parametric recipe against the CURRENT sketch
+ * state and replace its geometry in place. Returns the executor status (or
+ * 'no-recipe' when the body has no recorded recipe). On-demand for now; a future
+ * timeline-edit / auto-recompute-on-sketch-change trigger will call this.
+ */
+async function recomputeBodyFromRecipe(
+  bodyId: string,
+): Promise<RecomputeStatus | 'no-recipe'> {
+  const recipe = recipeForBody(featureRecipes, bodyId);
+  if (!recipe) return 'no-recipe';
+  await initWasm();
+  const deps: RecomputeDeps = {
+    getContour: (id) => contours.find((c) => c.id === id),
+    worldMatrix: contourWorldMatrix,
+    loftJson: (json) => {
+      try {
+        return loft_contours_json(json);
+      } catch {
+        return null;
+      }
+    },
+    revolveJson: (json) => {
+      try {
+        return revolve_contour_json(json);
+      } catch {
+        return null;
+      }
+    },
+  };
+  const res = recomputeFeature(recipe, deps);
+  if (res.status === 'ok' && res.geometry) {
+    pushMeshUndo('Feature neu berechnen');
+    await replaceBodyGeometryFull(bodyId, res.geometry);
+  }
+  return res.status;
+}
+
+/**
+ * Test-only: extrude a specific contour through the real WASM op + recipe
+ * capture (mirrors commitExtrude without the drag UI). Returns the new body id.
+ */
+async function testExtrudeContour(
+  contourId: string,
+  distanceMm: number,
+): Promise<string | null> {
+  const c = contours.find((x) => x.id === contourId);
+  if (!c || !c.closed || c.points.length < 3) return null;
+  await initWasm();
+  const base = contourLoftPayload(c, contourWorldMatrix(c));
+  let mesh: ReturnType<typeof loft_contours_json> | null;
+  try {
+    mesh = loft_contours_json(buildExtrudeLoftPayload(base, distanceMm));
+  } catch {
+    mesh = null;
+  }
+  if (!mesh || mesh.triangle_count === 0) return null;
+  await promoteMeshToNewBody(mesh, t('solid.bodyExtrude'), {
+    bodyKind: 'solid',
+    featureKind: 'extrude',
+    makeRecipe: (bid) => ({
+      id: recipeIdForBody(bid),
+      bodyId: bid,
+      kind: 'extrude',
+      sourceContourIds: [c.id],
+      distanceMm,
+    }),
+  });
+  return ab()?.id ?? null;
 }
 
 /** Bodies hidden by the #30 timeline rollback marker (suppressed features). */
@@ -6484,6 +6560,15 @@ async function boot() {
     timelineFeatureCount: () => featureTimelineCount(),
     featureRecipeCount: () => featureRecipes.length,
     featureRecipeForBody: (bodyId: string) => recipeForBody(featureRecipes, bodyId) ?? null,
+    recomputeBody: (bodyId: string) => recomputeBodyFromRecipe(bodyId),
+    testExtrudeContour: (contourId: string, distanceMm: number) =>
+      testExtrudeContour(contourId, distanceMm),
+    setExtrudeRecipeDistance: (bodyId: string, mm: number) => {
+      const r = recipeForBody(featureRecipes, bodyId);
+      if (!r || r.kind !== 'extrude') return false;
+      featureRecipes = withRecipe(featureRecipes, { ...r, distanceMm: mm });
+      return true;
+    },
     timelineMarker: () => getTimelineMarker(),
     timelineActiveCount: () => timelineActiveCount(),
     setTimelineMarker: (n: number) => {
