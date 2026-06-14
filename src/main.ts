@@ -3319,6 +3319,15 @@ async function replaceBodyGeometryFull(
   if (!body) return;
   replaceBodyGeometry(body, geometry);
   await commitBodyGeometry(body);
+  // Dispose old GPU resources before clearing — clear() only detaches children.
+  body.meshGroup.traverse((node) => {
+    if (node instanceof THREE.Mesh || node instanceof THREE.LineSegments || node instanceof THREE.Points) {
+      node.geometry.dispose();
+      const mat = node.material;
+      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+      else mat.dispose();
+    }
+  });
   body.meshGroup.clear();
   await initWasm();
   const mesh = parse_stl_with_stride(new Uint8Array(body.meshBuffer!), body.displayStride);

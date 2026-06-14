@@ -5,7 +5,7 @@
  * `.ribbon-workspace[data-ribbon=<tab>]`, grouped by their i18n group key.
  * This means feature modules touch neither `index.html` nor `main.ts`.
  */
-import { refreshDynamicI18n, onLocaleChange } from '../i18n';
+import { refreshDynamicI18n } from '../i18n';
 import type { FeatureDef } from './registry';
 import type { FeatureHost } from './host';
 
@@ -79,8 +79,10 @@ export function mountFeatures(defs: FeatureDef[], host: FeatureHost): void {
     mounted++;
   }
 
+  // Translate the freshly-injected [data-i18n-key] nodes. Locale *changes* are
+  // already re-applied by main.ts's onLocaleChange handler (which walks the DOM),
+  // so we must NOT register another listener here.
   refreshDynamicI18n();
-  onLocaleChange(() => refreshDynamicI18n());
 
   if (mounted) console.info(`[features] mounted ${mounted} feature button(s)`);
 }

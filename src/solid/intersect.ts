@@ -96,10 +96,16 @@ export function geometryToMeshData(geom: THREE.BufferGeometry): MeshData {
   return { positions, indices };
 }
 
-function subtract(target: MeshData, tool: MeshData): ParsedMesh {
-  return mesh_boolean_subtract_json(
-    JSON.stringify({ target, tool }),
-  ) as unknown as ParsedMesh;
+function subtract(target: MeshData, tool: MeshData): ParsedMesh | null {
+  // The kernel throws (JsValue) on non-manifold / boundary-edge input. Catch it
+  // so a bad pair degrades to "no result" instead of an unhandled exception.
+  try {
+    return mesh_boolean_subtract_json(
+      JSON.stringify({ target, tool }),
+    ) as unknown as ParsedMesh;
+  } catch {
+    return null;
+  }
 }
 
 function parsedToMeshData(mesh: ParsedMesh): MeshData {
@@ -120,6 +126,7 @@ export function meshIntersect(
 ): ParsedMesh | null {
   // A − B → the part of A that lies OUTSIDE B.
   const aMinusB = subtract(targetWorld, toolWorld);
+  if (aMinusB === null) return null; // kernel rejected the operands
   if (aMinusB.indices.length === 0) {
     // Nothing was removed-or A is entirely inside B; fall back: if A−B is empty
     // the whole of A is the overlap.
@@ -127,7 +134,7 @@ export function meshIntersect(
   }
   // A − (A − B) → exactly the overlap A ∩ B.
   const result = subtract(targetWorld, weldMeshData(parsedToMeshData(aMinusB)));
-  if (result.indices.length === 0) return null;
+  if (result === null || result.indices.length === 0) return null;
   return result;
 }
 

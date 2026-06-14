@@ -96,6 +96,8 @@ function makeLine(host: FeatureHost, a: THREE.Vector3, b: THREE.Vector3, color: 
  * line + endpoint markers into `host.overlay`. Returns the diagonal + bbox.
  */
 export function quickMeasure(host: FeatureHost): QuickMeasureResult {
+  // Idempotent: drop any prior measure overlay so repeated runs don't accumulate.
+  clearMeasureOverlay(host);
   const box = activeBodyWorldBox(host);
   const diagonal = bboxDiagonal(box);
   const bbox = {

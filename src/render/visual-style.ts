@@ -33,6 +33,27 @@ function applyToMaterial(material: unknown, wireframe: boolean): void {
 }
 
 /**
+ * Read the current wireframe state from the first body material found, so the
+ * controller self-heals after a project reload (which replaces all materials
+ * with fresh `wireframe:false` ones). Returns false when there are no bodies.
+ */
+function detectWireframe(host: FeatureHost): boolean {
+  for (const body of host.getBodies()) {
+    let found: boolean | null = null;
+    body.meshGroup?.traverse((obj: unknown) => {
+      if (found !== null) return;
+      const o = obj as { isMesh?: boolean; material?: unknown };
+      if (o && o.isMesh) {
+        const m = Array.isArray(o.material) ? o.material[0] : o.material;
+        if (m && typeof m === 'object') found = !!(m as WireMaterial).wireframe;
+      }
+    });
+    if (found !== null) return found;
+  }
+  return false;
+}
+
+/**
  * Set the wireframe flag on every Mesh material under all bodies. A "Mesh" is
  * detected structurally (has an `isMesh` flag + a `material`) so we don't pin a
  * three.js class and stay robust to the shared instance.
@@ -64,7 +85,9 @@ export function createVisualStyleController(host: FeatureHost): VisualStyleContr
 
   const controller: VisualStyleController = {
     toggle(): boolean {
-      wireframe = !wireframe;
+      // Flip relative to the ACTUAL material state so we self-heal after a
+      // project reload reset the materials behind our back.
+      wireframe = !detectWireframe(host);
       applyMode(host, wireframe);
       return wireframe;
     },

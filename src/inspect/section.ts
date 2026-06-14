@@ -95,11 +95,14 @@ export function createSectionController(host: FeatureHost): SectionController {
   function clearOverlay(): void {
     for (const obj of overlayObjects) {
       host.overlay.remove(obj);
-      const mesh = obj as THREE.Mesh;
-      mesh.geometry?.dispose?.();
-      const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
-      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-      else mat?.dispose?.();
+      // Traverse so PlaneHelper's internal child geometry/material is freed too.
+      obj.traverse((node) => {
+        const mesh = node as THREE.Mesh;
+        mesh.geometry?.dispose?.();
+        const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+        else mat?.dispose?.();
+      });
     }
     overlayObjects.length = 0;
   }
