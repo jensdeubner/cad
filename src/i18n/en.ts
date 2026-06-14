@@ -873,6 +873,10 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/view-projection: perspective/ortho toggle ──
+  'view.projection': 'Projection',
+  'status.projectionOrtho': 'Orthographic projection',
+  'status.projectionPersp': 'Perspective projection',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',

@@ -874,6 +874,10 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/view-projection: Perspektive/Ortho-Umschalter ──
+  'view.projection': 'Projektion',
+  'status.projectionOrtho': 'Orthografische Projektion',
+  'status.projectionPersp': 'Perspektivische Projektion',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',

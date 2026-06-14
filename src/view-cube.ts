@@ -182,6 +182,11 @@ export class ViewCube {
     this.radius = dist;
   }
 
+  /** Swap the scene camera the cube mirrors (perspective/orthographic toggle). */
+  setMainCamera(camera: THREE.Camera): void {
+    this.mainCamera = camera;
+  }
+
   resize() {
     const w = Math.max(2, Math.round(this.host.clientWidth));
     const h = Math.max(2, Math.round(this.host.clientHeight));
