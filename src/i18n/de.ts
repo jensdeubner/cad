@@ -874,6 +874,11 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/pattern-circular ──
+  'solid.patternCircularAxis': 'Kreismuster (Achse)',
+  'solid.patternCircularBody': 'Muster',
+  'status.patternCircularDone': 'Kreismuster erstellt: {{count}} Kopien',
+  'status.patternCircularNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'OBJ exportieren',

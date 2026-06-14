@@ -873,6 +873,11 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/pattern-circular ──
+  'solid.patternCircularAxis': 'Circular Pattern (Axis)',
+  'solid.patternCircularBody': 'Pattern',
+  'status.patternCircularDone': 'Circular pattern created: {{count}} copies',
+  'status.patternCircularNoBody': 'No active body — load or create geometry first',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'Export OBJ',
