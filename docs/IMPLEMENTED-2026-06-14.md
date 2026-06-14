@@ -1,9 +1,9 @@
 # Umgesetzt: Fusion-Parität via Parallel-Agenten (2026-06-14)
 
 Ausführung des Plans aus `docs/PARALLEL-AGENTS-FUSION-PARITY.md` mit dem Backlog aus
-`docs/FUSION-360-PARITY.md`. Ergebnis auf Branch **`feat/pr0-registry-seam`** (PR0 + 16 Features),
-durchgängig grün: `typecheck`, `vitest` (977), `npm run build`, und **32/32 Playwright-E2E** über
-alle Features (DE+EN, null Konsolenfehler).
+`docs/FUSION-360-PARITY.md`. Ergebnis auf **`main`** (PR0 + **24 Features** in 3 Wellen),
+durchgängig grün: `typecheck`, `vitest` (**1009**), `npm run build`, und **46/46 Playwright-E2E**
+über alle Features (DE+EN, null Konsolenfehler).
 
 ## PR0 — Feature-Registry-Seam (Fundament)
 
@@ -41,6 +41,14 @@ Neuer Entkopplungs-Seam, damit Features sich selbst registrieren statt `main.ts`
 | Look At + Named Views | `nav/views.ts` | #5, #7 |
 | Darstellungsstil (Wireframe-Toggle) | `render/visual-style.ts` | Visual Styles |
 | OBJ-Export | `io/obj-export.ts` | #25 (Teil) |
+| OBJ-Import (Sample) | `io/obj-import.ts` | #25 (Teil) |
+| Körper duplizieren | `solid/duplicate.ts` | Move/Copy |
+| Begrenzungsrahmen-Körper | `solid/bbox-body.ts` | Stock/BBox |
+| Konvexe Hülle | `solid/convex-hull.ts` | Convex Hull |
+| Maßstab (Faktor) | `solid/scale-factor.ts` | Scale |
+| Sichtbarkeit umschalten | `view/visibility.ts` | #8 (Object Visibility) |
+| Isolieren | `view/isolate.ts` | #8 (Isolate) |
+| Kanten-Anzeige | `render/edge-display.ts` | Visual Styles (Edges) |
 
 Alle Solid-Operationen sind **rein TypeScript** umgesetzt (Intersect komponiert den vorhandenen
 `mesh_boolean_subtract_json`-Kernel als `A∩B = A−(A−B)`), daher kein neuer Rust-Code und keine
@@ -48,11 +56,11 @@ Alle Solid-Operationen sind **rein TypeScript** umgesetzt (Intersect komponiert 
 
 ## Prozess
 
-PR0 solo → 2 Wellen à 8 Agenten in **isolierten git-Worktrees** (eigener Branch + Vite-Port),
+PR0 solo → **3 Wellen à 8 Agenten** in **isolierten git-Worktrees** (eigener Branch + Vite-Port),
 jeder mit Pflicht-DoD (typecheck + vitest + eigener E2E grün, 0 Konsolenfehler, DE+EN). Serielle
-Integration via `merge=union` (alle Append-Marker konfliktfrei). Abschluss: adversarialer
-Multi-Agent-Review (25 Agenten) → 11 verifizierte Funde, davon die echten Leaks/Crash-Pfade gefixt
-(`fix(review)`-Commit).
+Integration via `merge=union` (alle Append-Marker konfliktfrei). Abschluss: zwei adversariale
+Multi-Agent-Reviews → 13 verifizierte Funde gefixt (GPU-Dispose-Leaks, uncatchbare WASM-Throws,
+ConvexGeometry-/Null-Crash-Pfade, Overlay-Idempotenz), je mit Regressions-Test belegt.
 
 ## Bekannte Grenzen (dokumentiert, bewusst)
 
