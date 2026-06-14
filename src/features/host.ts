@@ -47,6 +47,8 @@ export interface FeatureHost {
   getBody(id: string): CadBodyRecord | undefined;
   getActiveBody(): CadBodyRecord | null;
   getActiveComponentId(): CadBodyId;
+  /** True when the body is hidden by the #30 timeline rollback marker. */
+  isTimelineSuppressed(bodyId: string): boolean;
 
   // ── sketch / contour state ──────────────────────────────────────
   getContours(): Contour[];

@@ -897,6 +897,10 @@ export const de: Record<string, string> = {
   'sketchConstraint.state.under': 'Unterbestimmt — {{dof}} Freiheitsgrad(e)',
   'sketchConstraint.state.full': 'Vollständig bestimmt',
   'sketchConstraint.state.over': 'Überbestimmt',
+  // ── #30: Timeline-Rollback ──
+  'timeline.rollbackTo': 'Bis hierher zurückrollen',
+  'timeline.suppressed': 'Zurückgerollt: {{count}} Feature(s) unterdrückt',
+  'timeline.atEnd': 'Timeline vollständig (alle Features aktiv)',
   // ── #16: Offset-Konstruktionsebene ──
   'construct.planes': 'Konstruktionsebenen',
   'construct.planeXY': 'Offset-Ebene XY',

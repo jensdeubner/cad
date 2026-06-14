@@ -26,16 +26,19 @@ export interface VisibilityController {
  * Returns true when there are no bodies (default "shown").
  */
 function detectVisible(host: FeatureHost): boolean {
-  for (const body of host.getBodies()) {
-    if (body.meshGroup) return body.meshGroup.visible;
-  }
-  return true;
+  const bodies = host.getBodies();
+  return bodies.length === 0 ? true : bodies[0].visible;
 }
 
-/** Apply a visible flag to every body's mesh group. */
+/**
+ * Apply a visible flag to every body. Sets the logical `visible` flag (user
+ * intent) and mirrors it onto the mesh group, composed with the timeline
+ * rollback gate so a suppressed body stays hidden.
+ */
 function applyVisible(host: FeatureHost, visible: boolean): void {
   for (const body of host.getBodies()) {
-    if (body.meshGroup) body.meshGroup.visible = visible;
+    body.visible = visible;
+    if (body.meshGroup) body.meshGroup.visible = visible && !host.isTimelineSuppressed(body.id);
   }
 }
 

@@ -21,10 +21,13 @@ export interface IsolateController {
   hiddenCount(): number;
 }
 
-/** Mirror a body's `visible` record flag onto its mesh group (main.ts convention). */
-function setBodyVisible(body: CadBodyRecord, visible: boolean): void {
+/**
+ * Mirror a body's `visible` record flag onto its mesh group (main.ts convention),
+ * composed with the #30 timeline rollback gate so a suppressed body stays hidden.
+ */
+function setBodyVisible(body: CadBodyRecord, visible: boolean, suppressed = false): void {
   body.visible = visible;
-  if (body.meshGroup) body.meshGroup.visible = visible;
+  if (body.meshGroup) body.meshGroup.visible = visible && !suppressed;
 }
 
 /** One controller per CadScene singleton. */
@@ -54,7 +57,7 @@ export function createIsolateController(host: FeatureHost): IsolateController {
           snapshot.set(body.id, body.visible);
           const keep = active != null && body.id === active.id;
           if (!keep && body.visible) hiddenNow += 1;
-          setBodyVisible(body, keep);
+          setBodyVisible(body, keep, host.isTimelineSuppressed(body.id));
         }
         saved = snapshot;
         hidden = hiddenNow;
@@ -64,7 +67,7 @@ export function createIsolateController(host: FeatureHost): IsolateController {
           for (const body of host.getBodies()) {
             const was = saved.get(body.id);
             // Bodies created while isolated have no snapshot — leave them shown.
-            setBodyVisible(body, was ?? true);
+            setBodyVisible(body, was ?? true, host.isTimelineSuppressed(body.id));
           }
         }
         saved = null;

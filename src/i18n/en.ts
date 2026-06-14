@@ -896,6 +896,10 @@ export const en: Record<string, string> = {
   'sketchConstraint.state.under': 'Under-constrained — {{dof}} DOF',
   'sketchConstraint.state.full': 'Fully constrained',
   'sketchConstraint.state.over': 'Over-constrained',
+  // ── #30: timeline rollback ──
+  'timeline.rollbackTo': 'Roll back to here',
+  'timeline.suppressed': 'Rolled back: {{count}} feature(s) suppressed',
+  'timeline.atEnd': 'Timeline complete (all features active)',
   // ── #16: offset construction plane ──
   'construct.planes': 'Construction Planes',
   'construct.planeXY': 'Offset Plane XY',

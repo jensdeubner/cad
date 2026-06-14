@@ -223,7 +223,7 @@ Dieses Werkzeug ist **kein Fusion-Klon**, sondern ein fokussierter **Scan-/Mesh-
 | Home View | core | ✅ | `src/main.ts:1508`; isometrische Standard-Orientierung |
 | Browser (Komponentenbaum) | core | ✅ (teilw.) | CadScene-Hierarchie + Browser-Panel; **kein voller Origin/Joints-Knoten-Drill-Down** |
 | Units / Document Settings | core | ✅ (teilw.) | `src/sketch-dimension.ts:42`; mm/cm/m/inch für Bemaßung; **kein dokumentweiter Units-Knoten** |
-| Parametric Timeline | core | 🟡 | Feature-Log existiert (`src/feature-timeline.ts`), aber **display-only, kein parametrisches Replay/Rollback** |
+| Parametric Timeline | core | 🟡 | **Rollback umgesetzt** (Phase 1: Marker + Feature-Suppression, `src/feature-timeline.ts`; siehe `docs/IMPLEMENTED-30-TIMELINE-2026-06-14.md`). Volles parametrisches Recompute (Feature-Rezepte re-ausführen) weiterhin offen |
 | New Component (Assemble) | core | 🟡 | Hierarchie vorhanden, kein vollwertiger Assemble-Erzeugungs-Flow |
 | Joint (+ alle Typen: Rigid/Revolute/Slider/…) | core/common | ➖ | Keine Baugruppen-Joints; out-of-scope für Scan-Tracer |
 | Measure | core | 🟡 | Nur 2D-Skizzenbemaßung; **kein 3D-Punkt/Winkel/Fläche/Volumen-Messwerkzeug** |

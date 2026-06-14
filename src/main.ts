@@ -177,7 +177,15 @@ import {
   type Sketch,
 } from './sketch';
 import type { SketchDimension, SketchDimensionKind, SketchUnit } from './sketch-dimension';
-import { appendFeature, bindFeatureTimeline } from './feature-timeline';
+import {
+  appendFeature,
+  bindFeatureTimeline,
+  featureTimelineCount,
+  getTimelineMarker,
+  setTimelineMarker,
+  suppressedBodyIds,
+  timelineActiveCount,
+} from './feature-timeline';
 import {
   buildMeshArchive,
   emptyStlBuffer,
@@ -419,7 +427,7 @@ const historyTimeline = bindHistoryTimeline(fusionTimelineEl, {
   onJumpTo: (position) => jumpToHistory(position),
   getView: () => undoHistory.getTimeline(),
 });
-const featureTimeline = bindFeatureTimeline(fusionTimelineEl);
+const featureTimeline = bindFeatureTimeline(fusionTimelineEl, () => applyTimelineMarker(true));
 
 function refreshHistoryTimeline() {
   historyTimeline.refresh();
@@ -431,7 +439,33 @@ function refreshFeatureTimeline() {
 
 function recordSolidFeature(kind: FeatureKind, label: string, bodyId?: string) {
   appendFeature({ kind, label, bodyId });
+  // appendFeature moves the marker to the end, so re-apply (clears any prior
+  // rollback suppression now that a fresh feature is active).
+  applyTimelineMarker();
+}
+
+/** Bodies hidden by the #30 timeline rollback marker (suppressed features). */
+let timelineSuppressed = new Set<string>();
+
+/** Effective scene visibility = user's visible flag AND not rolled back. */
+function applyBodyVisibility(body: CadBodyRecord): void {
+  body.meshGroup.visible = body.visible && !timelineSuppressed.has(body.id);
+}
+
+/** Apply the timeline rollback marker: hide bodies created by suppressed features. */
+function applyTimelineMarker(announce = false): void {
+  timelineSuppressed = new Set(suppressedBodyIds());
+  for (const body of cadScene.listBodies()) applyBodyVisibility(body);
   refreshFeatureTimeline();
+  refreshBrowserPanel();
+  if (announce) {
+    const suppressedCount = featureTimelineCount() - timelineActiveCount();
+    setStatus(
+      suppressedCount > 0
+        ? t('timeline.suppressed', { count: suppressedCount })
+        : t('timeline.atEnd'),
+    );
+  }
 }
 let transformUndoPushed = false;
 let strokeUndoPushed = false;
@@ -2702,7 +2736,7 @@ function toggleBrowserItem(id: BrowserItemId) {
         setStatus(next ? t('status.traceOn') : t('status.traceOff'));
       } else {
         body.visible = !body.visible;
-        body.meshGroup.visible = body.visible;
+        applyBodyVisibility(body);
       }
       refreshBrowserPanel();
       return;
@@ -2923,6 +2957,7 @@ function restoreSnapshot(snap: ReturnType<typeof snapshotNow>) {
   syncToolButtons(tool);
   onBodyTransformChanged();
   updateTransformGizmo();
+  applyTimelineMarker(); // keep suppression consistent after a snapshot restore
 }
 
 function performUndo() {
@@ -3511,6 +3546,7 @@ function makeFeatureHost(): FeatureHost {
     getBody: (id) => cadScene.getBody(id),
     getActiveBody: () => ab() ?? null,
     getActiveComponentId: () => ac().id,
+    isTimelineSuppressed: (id: string) => timelineSuppressed.has(id),
     getContours: () => contours,
     getSketches: () => sketches,
     getActiveSketchId: () => activeSketchId,
@@ -4001,6 +4037,7 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   clearDraftVisuals();
   undoHistory.clear();
   featureTimeline.clear();
+  timelineSuppressed.clear();
   refreshHistoryTimeline();
   refreshFeatureTimeline();
 
@@ -4158,6 +4195,7 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
     setWorkspaceMode('body', { tool: 'navigate' });
   }
 
+  applyTimelineMarker(); // re-sync mesh-group visibility after the suppression reset
   setStatus(
     t('status.projectLoaded', {
       contours: contours.length,
@@ -4185,6 +4223,7 @@ async function loadStlBuffer(
   transformControls.detach();
   undoHistory.clear();
   featureTimeline.clear();
+  timelineSuppressed.clear();
   refreshHistoryTimeline();
   refreshFeatureTimeline();
   ab().meshGroup.clear();
@@ -4209,6 +4248,7 @@ async function loadStlBuffer(
   refreshBrowserPanel();
   appMenu.selectTab('align', false);
   setWorkspaceMode('body', { tool: 'navigate' });
+  applyTimelineMarker(); // re-sync mesh-group visibility after the suppression reset
   setStatus(
     t('status.stlLoaded', { label, triangles: mesh.triangle_count.toLocaleString() }),
   );
@@ -5758,7 +5798,7 @@ function pickBodyMeshAt(clientX: number, clientY: number): string | null {
   const targets: THREE.Object3D[] = [];
   for (const body of cadScene.listBodies()) {
     const comp = cadScene.getComponent(body.componentId);
-    if (!comp?.visible || !body.visible || !body.meshGroup.children.length) continue;
+    if (!comp?.visible || !body.visible || !body.meshGroup.visible || !body.meshGroup.children.length) continue;
     for (const name of ['solid', 'festkoerper', 'wire'] as const) {
       const obj = body.meshGroup.getObjectByName(name);
       if (obj?.visible) targets.push(obj);
@@ -6332,6 +6372,20 @@ async function boot() {
       return { a: [d.a.x, d.a.y, d.a.z], b: [d.b.x, d.b.y, d.b.z] };
     },
     solveActiveSketch: () => solveActiveSketchConstraints(),
+    // ── #30 timeline rollback test bridge ──
+    timelineFeatureCount: () => featureTimelineCount(),
+    timelineMarker: () => getTimelineMarker(),
+    timelineActiveCount: () => timelineActiveCount(),
+    setTimelineMarker: (n: number) => {
+      const m = setTimelineMarker(n);
+      applyTimelineMarker(true);
+      return m;
+    },
+    visibleBodyCount: () => cadScene.listBodies().filter((b) => b.meshGroup.visible).length,
+    recordFeatureTest: (kind: FeatureKind, label: string, bodyId: string) => {
+      recordSolidFeature(kind, label, bodyId);
+      return featureTimelineCount();
+    },
   };
 }
 

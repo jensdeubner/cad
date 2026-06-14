@@ -1340,6 +1340,17 @@ select {
   background: linear-gradient(180deg, #1a2740 0%, #152238 100%);
   color: #94a3b8;
   font-size: 0.68rem;
+  cursor: pointer;
+}
+
+/* #30: a feature rolled back by the timeline marker (suppressed). */
+.timeline-feature-suppressed {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+.timeline-feature-suppressed .timeline-feature-label {
+  text-decoration: line-through;
 }
 
 .timeline-feature-icon {
