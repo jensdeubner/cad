@@ -884,6 +884,11 @@ export const de: Record<string, string> = {
   'view.wireframe': 'Drahtgitter',
   'status.wireframeOn': 'Drahtgitter-Darstellung aktiv',
   'status.wireframeOff': 'Schattierte Darstellung aktiv',
+  // ── feat/pattern-circular ──
+  'solid.patternCircularAxis': 'Kreismuster (Achse)',
+  'solid.patternCircularBody': 'Muster',
+  'status.patternCircularDone': 'Kreismuster erstellt: {{count}} Kopien',
+  'status.patternCircularNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'OBJ exportieren',

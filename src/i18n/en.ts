@@ -883,6 +883,11 @@ export const en: Record<string, string> = {
   'view.wireframe': 'Wireframe',
   'status.wireframeOn': 'Wireframe display active',
   'status.wireframeOff': 'Shaded display active',
+  // ── feat/pattern-circular ──
+  'solid.patternCircularAxis': 'Circular Pattern (Axis)',
+  'solid.patternCircularBody': 'Pattern',
+  'status.patternCircularDone': 'Circular pattern created: {{count}} copies',
+  'status.patternCircularNoBody': 'No active body — load or create geometry first',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'Export OBJ',

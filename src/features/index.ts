@@ -21,6 +21,7 @@ import './solid-primitives-extra';
 import './mesh-weld';
 import './inspect-com';
 import './render-visual-style';
+import './solid-pattern-circular';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
