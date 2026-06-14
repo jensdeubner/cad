@@ -881,4 +881,7 @@ export const en: Record<string, string> = {
   'solid.cylinder': 'Cylinder',
   'solid.sphere': 'Sphere',
   'status.primitiveCreated': '{{label}} created',
+  // ── Sweep ──
+  'solid.sweepBody': 'Sweep',
+  'status.sweepDone': 'Sweep created',
 };

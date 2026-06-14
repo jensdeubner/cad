@@ -882,4 +882,7 @@ export const de: Record<string, string> = {
   'solid.cylinder': 'Zylinder',
   'solid.sphere': 'Kugel',
   'status.primitiveCreated': '{{label}} erstellt',
+  // ── Sweep ──
+  'solid.sweepBody': 'Sweep',
+  'status.sweepDone': 'Sweep erstellt',
 };
