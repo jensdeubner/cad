@@ -874,6 +874,11 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/obj-export ──
+  'io.export': 'Export',
+  'io.objExport': 'OBJ exportieren',
+  'status.objExportDone': 'OBJ exportiert: {{faces}} Flächen',
+  'status.objExportNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
   // ── PR0: feature registry ──
   'feature.error': 'Feature »{{id}}« fehlgeschlagen',
   // ── PR0: Grundkörper ──
