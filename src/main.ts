@@ -407,6 +407,9 @@ let sketchDimensions: SketchDimension[] = [];
 let sketchConstraints: SketchConstraint[] = [];
 /** Parametric feature recipes (#30 Phase 2): re-executable solid-feature definitions. */
 let featureRecipes: FeatureRecipe[] = [];
+/** Bumped on every state restore/load/clear so an in-flight async recompute that
+ *  resolves afterwards can detect it is stale and skip applying (#30 Phase 2). */
+let recomputeEpoch = 0;
 let sketchUnit: SketchUnit = 'mm';
 let sketchDimKind: SketchDimensionKind = 'linear';
 let sketchConstraintKind: SketchConstraintKind = 'coincident';
@@ -477,6 +480,7 @@ async function recomputeBodyFromRecipe(
 ): Promise<RecomputeStatus | 'no-recipe'> {
   const recipe = recipeForBody(featureRecipes, bodyId);
   if (!recipe) return 'no-recipe';
+  const epoch = recomputeEpoch;
   await initWasm();
   const deps: RecomputeDeps = {
     getContour: (id) => contours.find((c) => c.id === id),
@@ -498,6 +502,9 @@ async function recomputeBodyFromRecipe(
   };
   const res = recomputeFeature(recipe, deps);
   if (res.status === 'ok' && res.geometry) {
+    // A state restore / load / clear during the await supersedes this (now stale)
+    // recompute — drop it so it cannot overwrite newer geometry.
+    if (epoch !== recomputeEpoch) return res.status;
     if (opts?.pushUndo !== false) pushMeshUndo('Feature neu berechnen');
     await replaceBodyGeometryFull(bodyId, res.geometry);
   }
@@ -3119,6 +3126,7 @@ function refreshBrowserPanel() {
 }
 
 function restoreSnapshot(snap: ReturnType<typeof snapshotNow>) {
+  recomputeEpoch++; // invalidate any in-flight recompute from before this restore
   contours = snap.contours.map((c) => ({
     ...c,
     points: c.points.map((p) => p.clone()),
@@ -4291,6 +4299,7 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   sketchDimensions = [];
   sketchConstraints = [];
   featureRecipes = [];
+  recomputeEpoch++;
   activeSketchId = null;
   sketchDims.clearSession();
   updateOriginPlaneHighlight(null);
@@ -5969,6 +5978,7 @@ function clearAllContours() {
   sketchDimensions = [];
   sketchConstraints = [];
   featureRecipes = [];
+  recomputeEpoch++;
   activeSketchId = null;
   sketchDims.clearSession();
   updateOriginPlaneHighlight(null);

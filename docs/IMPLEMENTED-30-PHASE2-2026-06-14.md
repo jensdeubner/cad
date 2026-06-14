@@ -53,6 +53,9 @@ Test-Bridge: `__cadDebug.recomputeBody` (+ test-only `testExtrudeContour`/`setEx
 Recipe-Bodies, deren Mesh *nicht* explizit wiederhergestellt wurde (parametrischer Sketch-Undo) —
 Bodies mit wiederhergestelltem Mesh (direkte Mesh-Edits) bleiben unangetastet. So matcht jeder Body
 nach Undo/Redo seine wiederhergestellte Kontur, ohne direkte Mesh-Edits zu überschreiben.
+Auto-Recompute ist fire-and-forget; ein `recomputeEpoch` (hochgezählt bei restore/load/clear)
+verwirft in-flight Recomputes, die nach einem State-Restore auflösen — sie überschreiben damit
+keine neuere Geometrie (schließt das Race „Drag-Ende → sofort Undo").
 
 **Timeline-Edit (INC3b):** Jeder extrude/revolve-Chip trägt einen ✎-Button (separat vom
 Chip-Klick=Rollback, `stopPropagation`). Klick → `parsePromptFloat` für Distanz/Winkel →
