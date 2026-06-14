@@ -883,6 +883,10 @@ export const de: Record<string, string> = {
   'mesh.subdivide': 'Unterteilen',
   'status.subdivideDone': 'Unterteilt: {{before}} → {{after}} Dreiecke',
   'status.subdivideNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/mesh-smooth: Laplace-Glättung ──
+  'mesh.smoothLaplacian': 'Laplace-Glätten',
+  'status.smoothLaplacianDone': 'Netz geglättet (Laplace)',
+  'status.smoothLaplacianNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── feat/bbox-body: Begrenzungsrahmen-Körper ──
   'solid.bboxBody': 'Begrenzungsrahmen',
   'status.bboxBodyDone': 'Begrenzungsrahmen-Körper erstellt',

@@ -882,6 +882,10 @@ export const en: Record<string, string> = {
   'mesh.subdivide': 'Subdivide',
   'status.subdivideDone': 'Subdivided: {{before}} → {{after}} triangles',
   'status.subdivideNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/mesh-smooth: Laplacian smoothing ──
+  'mesh.smoothLaplacian': 'Laplacian Smooth',
+  'status.smoothLaplacianDone': 'Mesh smoothed (Laplacian)',
+  'status.smoothLaplacianNoBody': 'No active body — load geometry or create a primitive first',
   // ── feat/bbox-body: Bounding Box body ──
   'solid.bboxBody': 'Bounding Box',
   'status.bboxBodyDone': 'Bounding box body created',
