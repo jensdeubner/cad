@@ -910,4 +910,7 @@ export const de: Record<string, string> = {
   'construct.geometry': 'Konstruktion',
   'construct.axisPoint': 'Achse + Punkt',
   'status.constructDone': 'Konstruktionsachsen und Ursprungspunkt erstellt',
+  // ── Sweep ──
+  'solid.sweepBody': 'Sweep',
+  'status.sweepDone': 'Sweep erstellt',
 };
