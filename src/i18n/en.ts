@@ -961,4 +961,8 @@ export const en: Record<string, string> = {
   'inspect.com': 'Center of Mass',
   'status.comDone': 'Center of mass: ({{x}}, {{y}}, {{z}})',
   'status.comNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/isolate: Isolate (show only the active body) ──
+  'view.isolate': 'Isolate',
+  'status.isolateOn': 'Isolated — only the active body is visible',
+  'status.isolateOff': 'Isolation cleared — all bodies visible',
 };
