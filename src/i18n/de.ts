@@ -962,4 +962,8 @@ export const de: Record<string, string> = {
   'inspect.com': 'Schwerpunkt',
   'status.comDone': 'Schwerpunkt: ({{x}}, {{y}}, {{z}})',
   'status.comNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/scale-factor: Maßstab (Scale by factor) ──
+  'solid.scaleFactor': 'Maßstab ×',
+  'status.scaleFactorDone': 'Körper skaliert ×1,5 um Bounding-Box-Mitte',
+  'status.scaleFactorNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
 };
