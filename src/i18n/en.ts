@@ -879,6 +879,7 @@ export const en: Record<string, string> = {
   'construct.planeXZ': 'Offset Plane XZ',
   'construct.planeYZ': 'Offset Plane YZ',
   'status.offsetPlaneDone': 'Offset plane {{axis}} @ {{d}} mm — sketch ready',
+  'status.dropFloorAlready': 'Body already rests on the floor',
   // ── feat/pattern-rect: Rectangular Pattern ──
   'solid.patternGrid': 'Rectangular Pattern',
   'solid.patternGridBody': 'Pattern',

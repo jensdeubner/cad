@@ -54,7 +54,9 @@ export function laplacianSmooth(
 
   const srcVertexCount = srcPos.count;
   const eps = 1e-5;
-  const invEps = 1 / eps;
+  // Round the reciprocal: 1/1e-5 is 99999.99999999999 in IEEE-754, which would
+  // hash vertices at grid boundaries inconsistently.
+  const invEps = Math.round(1 / eps);
 
   // Resolve the triangle list (indexed or implicit).
   const srcIndexAttr = geometry.getIndex();

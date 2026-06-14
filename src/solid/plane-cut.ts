@@ -21,6 +21,25 @@ function lerp3(a: Vec3, b: Vec3, t: number): Vec3 {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
+const EPS = 1e-9;
+function samePt(a: Vec3, b: Vec3): boolean {
+  return Math.abs(a[0] - b[0]) <= EPS && Math.abs(a[1] - b[1]) <= EPS && Math.abs(a[2] - b[2]) <= EPS;
+}
+
+/**
+ * Drop consecutive (and wrap-around) duplicate vertices. A triangle vertex that
+ * lies exactly on the plane is otherwise emitted twice (as a corner AND as a
+ * t=0/1 crossing point), which would fan into zero-area triangles → NaN normals.
+ */
+function dedupRing(poly: Vec3[]): Vec3[] {
+  const out: Vec3[] = [];
+  for (const p of poly) {
+    if (out.length === 0 || !samePt(out[out.length - 1], p)) out.push(p);
+  }
+  if (out.length > 1 && samePt(out[0], out[out.length - 1])) out.pop();
+  return out;
+}
+
 /**
  * Clip a single triangle (3 vertices) to the half-space `z >= planeZ` and emit
  * the resulting above-polygon as a fan of triangles into `out`. A clipped
@@ -49,14 +68,15 @@ function clipTriangleAbove(tri: [Vec3, Vec3, Vec3], planeZ: number, out: number[
     }
   }
 
-  if (poly.length < 3) return;
+  const ring = dedupRing(poly);
+  if (ring.length < 3) return;
 
   // Fan-triangulate the convex above-polygon.
-  for (let i = 1; i + 1 < poly.length; i++) {
+  for (let i = 1; i + 1 < ring.length; i++) {
     out.push(
-      poly[0][0], poly[0][1], poly[0][2],
-      poly[i][0], poly[i][1], poly[i][2],
-      poly[i + 1][0], poly[i + 1][1], poly[i + 1][2],
+      ring[0][0], ring[0][1], ring[0][2],
+      ring[i][0], ring[i][1], ring[i][2],
+      ring[i + 1][0], ring[i + 1][1], ring[i + 1][2],
     );
   }
 }
@@ -123,7 +143,19 @@ export function cutAbovePlaneZ(
   }
 
   out.setAttribute('position', new THREE.BufferAttribute(new Float32Array(kept), 3));
-  if (kept.length > 0) out.computeVertexNormals();
+  if (kept.length > 0) {
+    out.computeVertexNormals();
+    // Defence-in-depth: any zero-area sliver normalises to NaN — sanitise it.
+    const n = out.getAttribute('normal') as THREE.BufferAttribute | null;
+    if (n) {
+      for (let i = 0; i < n.count; i++) {
+        if (!Number.isFinite(n.getX(i)) || !Number.isFinite(n.getY(i)) || !Number.isFinite(n.getZ(i))) {
+          n.setXYZ(i, 0, 0, 1);
+        }
+      }
+      n.needsUpdate = true;
+    }
+  }
   out.computeBoundingBox();
   return out;
 }

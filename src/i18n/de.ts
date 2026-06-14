@@ -880,6 +880,7 @@ export const de: Record<string, string> = {
   'construct.planeXZ': 'Offset-Ebene XZ',
   'construct.planeYZ': 'Offset-Ebene YZ',
   'status.offsetPlaneDone': 'Offset-Ebene {{axis}} @ {{d}} mm — Skizze bereit',
+  'status.dropFloorAlready': 'Körper liegt bereits auf dem Boden',
   // ── feat/pattern-rect: Rechteckmuster ──
   'solid.patternGrid': 'Rechteckmuster',
   'solid.patternGridBody': 'Muster',

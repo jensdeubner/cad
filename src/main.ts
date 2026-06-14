@@ -3374,6 +3374,10 @@ function makeFeatureHost(): FeatureHost {
     addBodyFromGeometry,
     replaceBodyGeometry: replaceBodyGeometryFull,
     refreshBrowser: refreshBrowserPanel,
+    refreshBounds: () => {
+      cadScene.updateWorldMatrix();
+      updateWorldScanBounds();
+    },
     pushUndo,
     pushMeshUndo,
     markFeatureDone,

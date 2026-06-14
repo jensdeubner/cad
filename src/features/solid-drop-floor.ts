@@ -29,41 +29,44 @@ async function runDropFloor(host: FeatureHost): Promise<void> {
     return;
   }
 
-  host.pushMeshUndo(host.t('solid.dropFloor'));
-
-  // World-space copy of the geometry: local geometry baked through the body's
-  // current world matrix (mirrors solid-bbox-body / inspect-com).
+  // World-space copy of the geometry (mirrors solid-bbox-body / inspect-com):
+  // the pure helper then computes how far to lift so world min.z lands on 0.
   body.meshGroup.updateMatrixWorld(true);
   const worldGeom = geom.clone();
   worldGeom.applyMatrix4(body.meshGroup.matrixWorld);
+  const dz = dropToFloor(worldGeom).dz;
+  worldGeom.dispose();
 
-  // Pure helper computes how far to lift so world min.z lands on 0.
-  const result = dropToFloor(worldGeom);
-  const dz = result.dz;
+  const stash = () => {
+    body.meshGroup.updateMatrixWorld(true);
+    const worldBox = new THREE.Box3();
+    if (geom.boundingBox === null) geom.computeBoundingBox();
+    if (geom.boundingBox) worldBox.copy(geom.boundingBox).applyMatrix4(body.meshGroup.matrixWorld);
+    (window as unknown as { __cadFeature?: Record<string, unknown> }).__cadFeature ??= {};
+    (window as unknown as { __cadFeature: Record<string, unknown> }).__cadFeature.dropFloor = {
+      dz,
+      worldMin: [worldBox.min.x, worldBox.min.y, worldBox.min.z] as [number, number, number],
+      worldMax: [worldBox.max.x, worldBox.max.y, worldBox.max.z] as [number, number, number],
+    };
+  };
 
-  // Apply the lift as a world-space Z shift on the body's transform, then
-  // re-sync visuals. (Re-using replaceBodyGeometry would re-center the mesh and
-  // undo the shift, so we move the body instead — the geometry stays put.)
+  // Already on the floor → don't pollute the undo/feature history; still report.
+  if (Math.abs(dz) < 1e-4) {
+    stash();
+    host.setStatus(host.t('status.dropFloorAlready'));
+    return;
+  }
+
+  host.pushMeshUndo(host.t('solid.dropFloor'));
+  // Apply the lift on the body's transform CANONICALLY (re-using
+  // replaceBodyGeometry would re-center the mesh and undo the shift).
   body.transform = { ...body.transform, posZ: body.transform.posZ + dz };
-  body.meshGroup.position.z += dz;
-  body.meshGroup.updateMatrixWorld(true);
+  host.cadScene.applyBodyTransform(body.id);
+  host.refreshBounds();
 
   host.markFeatureDone('solid-drop-floor', host.t('solid.dropFloor'));
   host.setStatus(host.t('status.dropFloorDone'));
-
-  // Verify via the resulting world bounding box and stash hard numbers.
-  body.meshGroup.updateMatrixWorld(true);
-  const worldBox = new THREE.Box3();
-  if (geom.boundingBox === null) geom.computeBoundingBox();
-  if (geom.boundingBox) worldBox.copy(geom.boundingBox).applyMatrix4(body.meshGroup.matrixWorld);
-
-  (window as unknown as { __cadFeature?: Record<string, unknown> }).__cadFeature ??= {};
-  (window as unknown as { __cadFeature: Record<string, unknown> }).__cadFeature.dropFloor = {
-    dz,
-    worldMin: [worldBox.min.x, worldBox.min.y, worldBox.min.z] as [number, number, number],
-    worldMax: [worldBox.max.x, worldBox.max.y, worldBox.max.z] as [number, number, number],
-  };
-
+  stash();
   host.refreshBrowser();
 }
 

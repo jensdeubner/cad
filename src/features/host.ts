@@ -76,6 +76,12 @@ export interface FeatureHost {
    */
   replaceBodyGeometry(bodyId: string, geometry: THREE.BufferGeometry): Promise<void>;
   refreshBrowser(): void;
+  /**
+   * Recompute world matrices + world scan bounds. Call after mutating a body's
+   * transform directly (e.g. drop-to-floor) so camera framing / marker sizing
+   * stay correct.
+   */
+  refreshBounds(): void;
 
   // ── undo + feature log ──────────────────────────────────────────
   /** Snapshot for undo (no mesh buffers — cheap; geometry-only edits). */
