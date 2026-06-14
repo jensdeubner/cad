@@ -901,6 +901,10 @@ export const en: Record<string, string> = {
   'status.separateDone': 'Separated into {{count}} bodies',
   'status.separateOne': 'Only one connected shell — nothing to separate',
   'status.separateNoBody': 'No active body — load geometry or create a primitive first',
+  // ── #33: Remesh (refine to target edge length) ──
+  'mesh.remesh': 'Remesh (refine)',
+  'status.remeshDone': 'Remeshed: {{before}} → {{after}} triangles',
+  'status.remeshNoBody': 'No active body — load geometry or create a primitive first',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',

@@ -45,6 +45,7 @@ import './inspect-measure-area';
 import './nav-named-views';
 import './mesh-hole-fill';
 import './mesh-separate';
+import './mesh-remesh';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

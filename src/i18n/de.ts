@@ -902,6 +902,10 @@ export const de: Record<string, string> = {
   'status.separateDone': 'In {{count}} Körper getrennt',
   'status.separateOne': 'Nur eine zusammenhängende Schale — nichts zu trennen',
   'status.separateNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── #33: Remesh (refine to target edge length) ──
+  'mesh.remesh': 'Neu vernetzen',
+  'status.remeshDone': 'Neu vernetzt: {{before}} → {{after}} Dreiecke',
+  'status.remeshNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',
