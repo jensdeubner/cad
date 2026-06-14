@@ -873,6 +873,11 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/weld: Make Closed / Weld ──
+  'mesh.repair': 'Repair',
+  'mesh.weld': 'Weld',
+  'status.weldDone': 'Welded: {{before}} → {{after}} vertices',
+  'status.weldNoBody': 'Weld: no active body with mesh',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'Export OBJ',

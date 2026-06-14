@@ -874,6 +874,11 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/weld: Make Closed / Verschweißen ──
+  'mesh.repair': 'Reparatur',
+  'mesh.weld': 'Verschweißen',
+  'status.weldDone': 'Verschweißt: {{before}} → {{after}} Vertices',
+  'status.weldNoBody': 'Verschweißen: kein aktiver Körper mit Mesh',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'OBJ exportieren',
