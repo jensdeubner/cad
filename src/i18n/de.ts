@@ -922,4 +922,8 @@ export const de: Record<string, string> = {
   'status.viewSaved': 'Ansicht gespeichert',
   'status.viewRestored': 'Ansicht geladen',
   'status.noSavedView': 'Keine gespeicherte Ansicht — zuerst „Ansicht speichern“',
+  // ── feat/primitives-extra: Weitere Grundkörper ──
+  'solid.torus': 'Torus',
+  'solid.cone': 'Kegel',
+  'solid.pyramid': 'Pyramide',
 };

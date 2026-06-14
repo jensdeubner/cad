@@ -921,4 +921,8 @@ export const en: Record<string, string> = {
   'status.viewSaved': 'View saved',
   'status.viewRestored': 'View restored',
   'status.noSavedView': 'No saved view — use "Save View" first',
+  // ── feat/primitives-extra: Further primitives ──
+  'solid.torus': 'Torus',
+  'solid.cone': 'Cone',
+  'solid.pyramid': 'Pyramid',
 };
