@@ -997,4 +997,9 @@ export const de: Record<string, string> = {
   'io.objImport': 'OBJ importieren',
   'status.objImportDone': 'OBJ importiert — {{tris}} Dreiecke',
   'status.objImportEmpty': 'OBJ leer oder ungültig — kein Körper erstellt',
+  // ── feat/plane-cut: Ebenenschnitt (keep +Z half) ──
+  'solid.planeCut': 'Ebenenschnitt',
+  'status.planeCutDone': 'Ebenenschnitt — untere Hälfte entfernt',
+  'status.planeCutEmpty': 'Ebenenschnitt leer — Ebene liegt über dem Körper',
+  'status.planeCutNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
 };

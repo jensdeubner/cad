@@ -996,4 +996,9 @@ export const en: Record<string, string> = {
   'io.objImport': 'Import OBJ',
   'status.objImportDone': 'OBJ imported — {{tris}} triangles',
   'status.objImportEmpty': 'OBJ empty or invalid — no body created',
+  // ── feat/plane-cut: Plane Cut (keep +Z half) ──
+  'solid.planeCut': 'Plane Cut',
+  'status.planeCutDone': 'Plane cut — lower half removed',
+  'status.planeCutEmpty': 'Plane cut empty — plane lies above the body',
+  'status.planeCutNoBody': 'No active body — load geometry or create a primitive first',
 };
