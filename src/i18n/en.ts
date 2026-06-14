@@ -871,4 +871,14 @@ export const en: Record<string, string> = {
   'status.dimProfileMissing': 'Profile not found',
   'status.dimApplyFailed': 'Could not apply dimension',
   'status.dimUpdated': 'Dimension updated: {{value}}',
+
+  // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── PR0: feature registry ──
+  'feature.error': 'Feature "{{id}}" failed',
+  // ── PR0: primitives ──
+  'solid.primitives': 'Primitives',
+  'solid.box': 'Box',
+  'solid.cylinder': 'Cylinder',
+  'solid.sphere': 'Sphere',
+  'status.primitiveCreated': '{{label}} created',
 };

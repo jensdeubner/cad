@@ -163,6 +163,7 @@ import type { FeatureKind } from './feature-timeline';
 import { bindHistoryTimeline } from './history-timeline';
 import { UndoHistory, captureSnapshot } from './undo';
 import { bindSolidFeatureButtons } from './solid-features';
+import { getFeatures, mountFeatures, type FeatureHost } from './features';
 import {
   beginSubtract,
   cancelSubtract,
@@ -421,6 +422,11 @@ let editDrag: {
 let pointMenuTarget: { contourId: string; pointIndex: number } | null = null;
 
 const scene = new THREE.Scene();
+
+/** Shared overlay group for registry-feature helpers (measure lines, gizmos…). */
+const featureOverlay = new THREE.Group();
+featureOverlay.name = 'feature-overlay';
+scene.add(featureOverlay);
 
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100000);
 const renderer = new THREE.WebGLRenderer({
@@ -3267,6 +3273,101 @@ async function promoteLoftToNewBody(mesh: {
   });
 }
 
+// ── Feature-registry host helpers (PR0) ────────────────────────────────────
+/** Tracks the last feature run, for `window.__cadDebug.lastFeature()`. */
+let lastFeatureId: string | null = null;
+function markFeatureDone(id: string) {
+  lastFeatureId = id;
+}
+
+/** Promote any three.js geometry to a new body; returns the new body id. */
+async function addBodyFromGeometry(
+  geometry: THREE.BufferGeometry,
+  labelPrefix: string,
+  bodyKind: BodyKind = 'solid',
+): Promise<string> {
+  const posAttr = geometry.getAttribute('position');
+  const positions =
+    posAttr.array instanceof Float32Array
+      ? (posAttr.array as Float32Array)
+      : new Float32Array(posAttr.array as ArrayLike<number>);
+  const idx = geometry.getIndex();
+  let indices: Uint32Array;
+  if (idx) {
+    indices =
+      idx.array instanceof Uint32Array
+        ? (idx.array as Uint32Array)
+        : new Uint32Array(idx.array as ArrayLike<number>);
+  } else {
+    indices = new Uint32Array(posAttr.count);
+    for (let i = 0; i < posAttr.count; i++) indices[i] = i;
+  }
+  await promoteMeshToNewBody(
+    { positions, indices, triangle_count: indices.length / 3 },
+    labelPrefix,
+    { bodyKind },
+  );
+  return ab().id;
+}
+
+/** Replace an existing body's mesh in place (mesh-edit features). */
+async function replaceBodyGeometryFull(
+  bodyId: string,
+  geometry: THREE.BufferGeometry,
+): Promise<void> {
+  const body = cadScene.getBody(bodyId);
+  if (!body) return;
+  replaceBodyGeometry(body, geometry);
+  await commitBodyGeometry(body);
+  body.meshGroup.clear();
+  await initWasm();
+  const mesh = parse_stl_with_stride(new Uint8Array(body.meshBuffer!), body.displayStride);
+  const built = buildScanMesh(body, mesh.positions, mesh.indices);
+  body.meshGroup.add(built);
+  disposeSolidBodyGeom(body.id);
+  refreshBodyMeshVisuals(body);
+  cadScene.updateWorldMatrix();
+  updateWorldScanBounds();
+  updateHitFeedback();
+  refreshBrowserPanel();
+}
+
+/** Build the FeatureHost passed to every registry feature (PR0 seam). */
+function makeFeatureHost(): FeatureHost {
+  return {
+    THREE,
+    t,
+    setStatus,
+    selectTab: (tab) => {
+      appMenu.selectTab(tab, false);
+      const ws = workspaceForTab(tab);
+      if (ws) setWorkspaceMode(ws);
+    },
+    scene,
+    camera,
+    renderer,
+    controls,
+    overlay: featureOverlay,
+    viewport,
+    pickBodySurfaceAt,
+    cadScene,
+    getBodies: () => cadScene.listBodies(),
+    getBody: (id) => cadScene.getBody(id),
+    getActiveBody: () => ab() ?? null,
+    getActiveComponentId: () => ac().id,
+    getContours: () => contours,
+    getSketches: () => sketches,
+    getActiveSketchId: () => activeSketchId,
+    addBodyFromGeometry,
+    replaceBodyGeometry: replaceBodyGeometryFull,
+    refreshBrowser: refreshBrowserPanel,
+    pushUndo,
+    pushMeshUndo,
+    markFeatureDone,
+    ensureWasm: initWasm,
+  };
+}
+
 function showSolidPreview(mesh: { positions: Float32Array; indices: Uint32Array }) {
   formGroup.clear();
   const geom = new THREE.BufferGeometry();
@@ -5845,6 +5946,9 @@ async function boot() {
 
   await initWasm();
 
+  // Feature-registry seam (PR0): render + wire all registered features.
+  mountFeatures(getFeatures(), makeFeatureHost());
+
   bindSolidFeatureButtons({
     setStatus,
     selectTab: (tab) => {
@@ -5871,6 +5975,47 @@ async function boot() {
   appMenu.selectTab('sketch', false);
   setWorkspaceMode('sketch', { tool: 'sketch-pick' });
   setStatus(t('status.sketchPick'));
+
+  // Read-only debug bridge for E2E tests (PR0). Lets Playwright assert real
+  // app state instead of just DOM presence.
+  const dbgTriCount = (b: { geometry: THREE.BufferGeometry | null } | null | undefined): number => {
+    const g = b?.geometry;
+    if (!g) return 0;
+    const idx = g.getIndex();
+    if (idx) return idx.count / 3;
+    return (g.getAttribute('position')?.count ?? 0) / 3;
+  };
+  const dbgBody = (id?: string) => (id ? cadScene.getBody(id) : ab());
+  (window as unknown as { __cadDebug: Record<string, unknown> }).__cadDebug = {
+    bodyCount: () => cadScene.listBodies().length,
+    sketchCount: () => sketches.length,
+    contourCount: () => contours.length,
+    activeTool: () => tool,
+    activeWorkspace: () => workspaceMode,
+    activeBodyId: () => ab()?.id ?? null,
+    bodyLabels: () => cadScene.listBodies().map((b) => b.label),
+    lastFeature: () => lastFeatureId,
+    features: () => getFeatures().map((f) => f.id),
+    status: () => dom.status?.textContent ?? '',
+    overlayCount: () => featureOverlay.children.length,
+    triangleCount: (id?: string) => dbgTriCount(dbgBody(id)),
+    bbox: (id?: string) => {
+      const g = dbgBody(id)?.geometry;
+      if (!g) return null;
+      g.computeBoundingBox();
+      const bb = g.boundingBox;
+      if (!bb) return null;
+      return {
+        min: [bb.min.x, bb.min.y, bb.min.z],
+        max: [bb.max.x, bb.max.y, bb.max.z],
+      };
+    },
+    runFeature: (id: string) => {
+      const f = getFeatures().find((x) => x.id === id);
+      if (!f) return Promise.reject(new Error(`unknown feature ${id}`));
+      return Promise.resolve(f.run(makeFeatureHost()));
+    },
+  };
 }
 
 boot();

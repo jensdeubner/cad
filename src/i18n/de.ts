@@ -872,4 +872,14 @@ export const de: Record<string, string> = {
   'status.dimProfileMissing': 'Profil nicht gefunden',
   'status.dimApplyFailed': 'Bemaßung konnte nicht angewendet werden',
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
+
+  // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── PR0: feature registry ──
+  'feature.error': 'Feature »{{id}}« fehlgeschlagen',
+  // ── PR0: Grundkörper ──
+  'solid.primitives': 'Grundkörper',
+  'solid.box': 'Quader',
+  'solid.cylinder': 'Zylinder',
+  'solid.sphere': 'Kugel',
+  'status.primitiveCreated': '{{label}} erstellt',
 };
