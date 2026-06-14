@@ -34,6 +34,7 @@ import './render-edge-display';
 import './solid-pattern-rect';
 import './mesh-subdivide';
 import './mesh-smooth';
+import './solid-drop-floor';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

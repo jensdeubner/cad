@@ -1009,4 +1009,8 @@ export const en: Record<string, string> = {
   'io.objImport': 'Import OBJ',
   'status.objImportDone': 'OBJ imported — {{tris}} triangles',
   'status.objImportEmpty': 'OBJ empty or invalid — no body created',
+  // ── feat/drop-floor: Drop to floor ──
+  'solid.dropFloor': 'Drop to Floor',
+  'status.dropFloorDone': 'Body dropped to floor (min Z = 0)',
+  'status.dropFloorNoBody': 'No active body — load geometry or create a primitive first',
 };
