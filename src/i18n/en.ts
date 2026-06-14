@@ -921,4 +921,8 @@ export const en: Record<string, string> = {
   'status.viewSaved': 'View saved',
   'status.viewRestored': 'View restored',
   'status.noSavedView': 'No saved view — use "Save View" first',
+  // ── feat/com-marker: center of mass + bounding box ──
+  'inspect.com': 'Center of Mass',
+  'status.comDone': 'Center of mass: ({{x}}, {{y}}, {{z}})',
+  'status.comNoBody': 'No active body — load geometry or create a primitive first',
 };

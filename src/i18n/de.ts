@@ -922,4 +922,8 @@ export const de: Record<string, string> = {
   'status.viewSaved': 'Ansicht gespeichert',
   'status.viewRestored': 'Ansicht geladen',
   'status.noSavedView': 'Keine gespeicherte Ansicht — zuerst „Ansicht speichern“',
+  // ── feat/com-marker: Schwerpunkt + Bounding-Box ──
+  'inspect.com': 'Schwerpunkt',
+  'status.comDone': 'Schwerpunkt: ({{x}}, {{y}}, {{z}})',
+  'status.comNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
 };
