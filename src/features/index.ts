@@ -12,6 +12,7 @@ import './mesh-reverse-normal';
 import './mesh-reduce';
 import './inspect-section';
 import './io-obj-export';
+import './construct-axis-point';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

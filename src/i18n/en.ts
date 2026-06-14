@@ -905,4 +905,8 @@ export const en: Record<string, string> = {
   'view.section': 'Section',
   'status.sectionOn': 'Section plane active',
   'status.sectionOff': 'Section plane off',
+  // ── feat/construct-axis: Construction geometry ──
+  'construct.geometry': 'Construction',
+  'construct.axisPoint': 'Axis + Point',
+  'status.constructDone': 'Construction axes and origin point created',
 };

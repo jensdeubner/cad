@@ -906,4 +906,8 @@ export const de: Record<string, string> = {
   'view.section': 'Schnittansicht',
   'status.sectionOn': 'Schnittebene aktiv',
   'status.sectionOff': 'Schnittebene aus',
+  // ── feat/construct-axis: Konstruktionsgeometrie ──
+  'construct.geometry': 'Konstruktion',
+  'construct.axisPoint': 'Achse + Punkt',
+  'status.constructDone': 'Konstruktionsachsen und Ursprungspunkt erstellt',
 };
