@@ -897,6 +897,11 @@ export const de: Record<string, string> = {
   'status.holeFillDone': '{{count}} Loch/Löcher gefüllt (+{{tris}} Dreiecke)',
   'status.holeFillNone': 'Keine Löcher gefunden — Netz ist geschlossen',
   'status.holeFillNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/separate: split disconnected shells into bodies ──
+  'mesh.separate': 'Körper trennen',
+  'status.separateDone': 'In {{count}} Körper getrennt',
+  'status.separateOne': 'Nur eine zusammenhängende Schale — nichts zu trennen',
+  'status.separateNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',

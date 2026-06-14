@@ -896,6 +896,11 @@ export const en: Record<string, string> = {
   'status.holeFillDone': 'Filled {{count}} hole(s) (+{{tris}} triangles)',
   'status.holeFillNone': 'No holes found — mesh is already closed',
   'status.holeFillNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/separate: split disconnected shells into bodies ──
+  'mesh.separate': 'Separate bodies',
+  'status.separateDone': 'Separated into {{count}} bodies',
+  'status.separateOne': 'Only one connected shell — nothing to separate',
+  'status.separateNoBody': 'No active body — load geometry or create a primitive first',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',
