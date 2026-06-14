@@ -922,4 +922,10 @@ export const de: Record<string, string> = {
   'status.viewSaved': 'Ansicht gespeichert',
   'status.viewRestored': 'Ansicht geladen',
   'status.noSavedView': 'Keine gespeicherte Ansicht — zuerst „Ansicht speichern“',
+  // ── feat/measure: 3D-Messwerkzeug ──
+  'inspect.measure': 'Messen',
+  'status.measureDone': 'Diagonale {{d}} mm',
+  'status.measureNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  'status.measurePick': 'Messen: zwei Flächenpunkte im 3D-Fenster anklicken',
+  'status.measurePoint2': 'Messen: zweiten Punkt anklicken',
 };
