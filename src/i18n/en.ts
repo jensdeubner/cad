@@ -927,4 +927,10 @@ export const en: Record<string, string> = {
   'status.measureNoBody': 'No active body — load geometry or create a primitive first',
   'status.measurePick': 'Measure: click two surface points in the 3D view',
   'status.measurePoint2': 'Measure: click the second point',
+  // ── feat/intersect: Intersect + interference ──
+  'solid.intersectBody': 'Intersection',
+  'status.intersectDone': 'Intersection created',
+  'status.intersectEmpty': 'Intersection empty — bodies do not overlap',
+  'inspect.interference': 'Interference',
+  'status.interferenceDone': 'Interference checked — overlap {{volume}} mm³',
 };

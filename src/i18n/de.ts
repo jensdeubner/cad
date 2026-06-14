@@ -928,4 +928,10 @@ export const de: Record<string, string> = {
   'status.measureNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   'status.measurePick': 'Messen: zwei Flächenpunkte im 3D-Fenster anklicken',
   'status.measurePoint2': 'Messen: zweiten Punkt anklicken',
+  // ── feat/intersect: Schneiden + Interferenz ──
+  'solid.intersectBody': 'Schnittmenge',
+  'status.intersectDone': 'Schnittmenge erstellt',
+  'status.intersectEmpty': 'Schnittmenge leer — Körper überlappen sich nicht',
+  'inspect.interference': 'Interferenz',
+  'status.interferenceDone': 'Interferenz geprüft — Überlappung {{volume}} mm³',
 };

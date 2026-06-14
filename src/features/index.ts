@@ -16,6 +16,7 @@ import './construct-axis-point';
 import './solid-sweep';
 import './nav-views';
 import './inspect-measure';
+import './solid-intersect';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
