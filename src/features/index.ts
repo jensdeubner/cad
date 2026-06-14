@@ -23,6 +23,7 @@ import './inspect-com';
 import './render-visual-style';
 import './solid-pattern-circular';
 import './solid-mirror-plane';
+import './solid-convex-hull';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

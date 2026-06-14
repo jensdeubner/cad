@@ -961,4 +961,8 @@ export const en: Record<string, string> = {
   'inspect.com': 'Center of Mass',
   'status.comDone': 'Center of mass: ({{x}}, {{y}}, {{z}})',
   'status.comNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/convex-hull: Convex Hull ──
+  'solid.convexHull': 'Convex Hull',
+  'status.convexHullDone': 'Convex hull created as a new body',
+  'status.convexHullNoBody': 'No active body — load geometry or create a primitive first',
 };

@@ -962,4 +962,8 @@ export const de: Record<string, string> = {
   'inspect.com': 'Schwerpunkt',
   'status.comDone': 'Schwerpunkt: ({{x}}, {{y}}, {{z}})',
   'status.comNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/convex-hull: Konvexe Hülle ──
+  'solid.convexHull': 'Konvexe Hülle',
+  'status.convexHullDone': 'Konvexe Hülle als neuer Körper erstellt',
+  'status.convexHullNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
 };
