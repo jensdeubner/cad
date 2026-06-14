@@ -873,6 +873,11 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── [#1 measure] Measure area (total surface + coplanar region) ──
+  'inspect.measureArea': 'Measure area',
+  'status.measureAreaDone': 'Total surface area: {{area}} mm²',
+  'status.measureAreaFace': 'Face region: {{area}} mm²',
+  'status.measureAreaNoBody': 'No active body — load geometry or create a primitive first',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',

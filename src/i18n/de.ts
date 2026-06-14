@@ -874,6 +874,11 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── [#1 measure] Fläche messen (Gesamtoberfläche + koplanare Region) ──
+  'inspect.measureArea': 'Fläche messen',
+  'status.measureAreaDone': 'Gesamtoberfläche: {{area}} mm²',
+  'status.measureAreaFace': 'Flächenregion: {{area}} mm²',
+  'status.measureAreaNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',
