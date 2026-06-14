@@ -873,6 +873,12 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── #30 Phase 2: timeline feature edit (parametric recompute) ──
+  'timeline.editFeature': 'Edit feature',
+  'timeline.editPromptExtrude': 'New extrude distance (mm):',
+  'timeline.editPromptRevolve': 'New revolve angle (degrees):',
+  'status.featureRecomputed': 'Feature recomputed: {{label}}',
+  'status.featureNotEditable': 'This feature is not parametrically editable',
   // ── CAD script console (LLM-driven code-CAD layer) ──
   'cadscript.group': 'CAD Script',
   'cadscript.open': 'Script Console',

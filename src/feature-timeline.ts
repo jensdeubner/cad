@@ -113,7 +113,11 @@ function truncateLabel(label: string, max = 24): string {
 
 const FEATURES_EXPANDED_KEY = 'cad-features-expanded';
 
-export function bindFeatureTimeline(root: HTMLElement, onMarkerChange?: () => void) {
+export function bindFeatureTimeline(
+  root: HTMLElement,
+  onMarkerChange?: () => void,
+  onEditFeature?: (record: FeatureRecord) => void,
+) {
   const panel = root.querySelector('#timeline-features') as HTMLElement | null;
   const toggle = root.querySelector('#timeline-features-toggle') as HTMLButtonElement | null;
   let expanded = localStorage.getItem(FEATURES_EXPANDED_KEY) !== '0';
@@ -140,10 +144,15 @@ export function bindFeatureTimeline(root: HTMLElement, onMarkerChange?: () => vo
         const suppressed = i >= marker;
         const cls = `timeline-feature-chip${suppressed ? ' timeline-feature-suppressed' : ''}`;
         const title = `${escapeHtml(kindLabel)} · ${escapeHtml(feat.label)} — ${escapeHtml(t('timeline.rollbackTo'))}`;
+        // #30 Phase 2: extrude/revolve features carry an editable parametric recipe.
+        const editable = feat.kind === 'extrude' || feat.kind === 'revolve';
+        const editBtn = editable
+          ? `<button class="timeline-feature-edit" data-edit-index="${i}" title="${escapeHtml(t('timeline.editFeature'))}" aria-label="${escapeHtml(t('timeline.editFeature'))}" style="margin-left:4px;border:none;background:transparent;color:inherit;cursor:pointer;font-size:11px;opacity:0.75;padding:0 2px;">✎</button>`
+          : '';
         return `<span class="${cls}" role="listitem" data-feature-index="${i}" title="${title}">
           <span class="timeline-feature-icon" aria-hidden="true">${icon}</span>
           <span class="timeline-feature-kind">${escapeHtml(kindLabel)}</span>
-          <span class="timeline-feature-label">${escapeHtml(truncateLabel(feat.label))}</span>
+          <span class="timeline-feature-label">${escapeHtml(truncateLabel(feat.label))}</span>${editBtn}
         </span>`;
       })
       .join('');
@@ -159,6 +168,15 @@ export function bindFeatureTimeline(root: HTMLElement, onMarkerChange?: () => vo
   });
 
   panel?.addEventListener('click', (e) => {
+    // Edit (✎) button: edit the feature's parametric recipe (does NOT roll the marker).
+    const editBtn = (e.target as HTMLElement).closest('[data-edit-index]') as HTMLElement | null;
+    if (editBtn) {
+      e.stopPropagation();
+      const editIdx = parseInt(editBtn.dataset.editIndex ?? '', 10);
+      const rec = records[editIdx];
+      if (rec) onEditFeature?.(rec);
+      return;
+    }
     const chip = (e.target as HTMLElement).closest('[data-feature-index]') as HTMLElement | null;
     const raw = chip?.dataset.featureIndex;
     if (raw === undefined) return;

@@ -874,6 +874,12 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── #30 Phase 2: Timeline-Feature-Edit (parametrisches Recompute) ──
+  'timeline.editFeature': 'Feature bearbeiten',
+  'timeline.editPromptExtrude': 'Neue Extrusions-Distanz (mm):',
+  'timeline.editPromptRevolve': 'Neuer Drehwinkel (Grad):',
+  'status.featureRecomputed': 'Feature neu berechnet: {{label}}',
+  'status.featureNotEditable': 'Dieses Feature ist nicht parametrisch editierbar',
   // ── CAD-Skript-Konsole (LLM-getriebene Code-CAD-Ebene) ──
   'cadscript.group': 'CAD-Skript',
   'cadscript.open': 'Skript-Konsole',

@@ -192,7 +192,7 @@ import {
   stlHasTriangles,
   syncSceneFromProjectMeta,
 } from './project-io';
-import type { FeatureKind } from './feature-timeline';
+import type { FeatureKind, FeatureRecord } from './feature-timeline';
 import {
   type FeatureRecipe,
   recipeIdForBody,
@@ -444,7 +444,11 @@ const historyTimeline = bindHistoryTimeline(fusionTimelineEl, {
   onJumpTo: (position) => jumpToHistory(position),
   getView: () => undoHistory.getTimeline(),
 });
-const featureTimeline = bindFeatureTimeline(fusionTimelineEl, () => applyTimelineMarker(true));
+const featureTimeline = bindFeatureTimeline(
+  fusionTimelineEl,
+  () => applyTimelineMarker(true),
+  (record) => editFeatureRecipe(record),
+);
 
 function refreshHistoryTimeline() {
   historyTimeline.refresh();
@@ -515,6 +519,50 @@ async function recomputeDependentsForContours(contourIds: readonly string[]): Pr
   for (const bodyId of bodyIds) {
     await recomputeBodyFromRecipe(bodyId, { pushUndo: false });
   }
+}
+
+/**
+ * #30 Phase 2: update an extrude/revolve feature's editable recipe parameter and
+ * recompute its body as one mesh-undo step. Returns true if applied.
+ */
+async function applyRecipeParamEdit(bodyId: string, value: number): Promise<boolean> {
+  const r = recipeForBody(featureRecipes, bodyId);
+  if (!r) return false;
+  if (r.kind === 'extrude') {
+    if (!Number.isFinite(value) || value === 0) return false;
+    featureRecipes = withRecipe(featureRecipes, { ...r, distanceMm: value });
+  } else if (r.kind === 'revolve') {
+    featureRecipes = withRecipe(featureRecipes, {
+      ...r,
+      angleDeg: THREE.MathUtils.clamp(value, 1, 360),
+    });
+  } else {
+    return false; // loft has no single scalar parameter to edit here
+  }
+  const status = await recomputeBodyFromRecipe(bodyId);
+  return status === 'ok';
+}
+
+/** Timeline ✎ edit: prompt for a feature's parametric value and recompute. */
+function editFeatureRecipe(record: FeatureRecord): void {
+  const bodyId = record.bodyId;
+  const r = bodyId ? recipeForBody(featureRecipes, bodyId) : undefined;
+  if (!bodyId || !r || (r.kind !== 'extrude' && r.kind !== 'revolve')) {
+    setStatus(t('status.featureNotEditable'));
+    return;
+  }
+  const current = r.kind === 'extrude' ? r.distanceMm : r.angleDeg;
+  const msg =
+    r.kind === 'extrude' ? t('timeline.editPromptExtrude') : t('timeline.editPromptRevolve');
+  const value = parsePromptFloat(msg, current);
+  if (value === null) return;
+  void applyRecipeParamEdit(bodyId, value).then((ok) => {
+    setStatus(
+      ok
+        ? t('status.featureRecomputed', { label: bodyLabelForId(bodyId) ?? bodyId })
+        : t('status.featureNotEditable'),
+    );
+  });
 }
 
 /**
@@ -6616,6 +6664,8 @@ async function boot() {
       solveActiveSketchConstraints();
       return true;
     },
+    editFeatureRecipeParam: (bodyId: string, value: number) =>
+      applyRecipeParamEdit(bodyId, value),
     timelineMarker: () => getTimelineMarker(),
     timelineActiveCount: () => timelineActiveCount(),
     setTimelineMarker: (n: number) => {
