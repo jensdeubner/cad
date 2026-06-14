@@ -983,4 +983,8 @@ export const en: Record<string, string> = {
   'solid.convexHull': 'Convex Hull',
   'status.convexHullDone': 'Convex hull created as a new body',
   'status.convexHullNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/scale-factor: Maßstab (Scale by factor) ──
+  'solid.scaleFactor': 'Scale ×',
+  'status.scaleFactorDone': 'Body scaled ×1.5 about bounding-box center',
+  'status.scaleFactorNoBody': 'No active body — load geometry or create a primitive first',
 };

@@ -984,4 +984,8 @@ export const de: Record<string, string> = {
   'solid.convexHull': 'Konvexe Hülle',
   'status.convexHullDone': 'Konvexe Hülle als neuer Körper erstellt',
   'status.convexHullNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/scale-factor: Maßstab (Scale by factor) ──
+  'solid.scaleFactor': 'Maßstab ×',
+  'status.scaleFactorDone': 'Körper skaliert ×1,5 um Bounding-Box-Mitte',
+  'status.scaleFactorNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
 };
