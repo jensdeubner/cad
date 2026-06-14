@@ -961,4 +961,9 @@ export const en: Record<string, string> = {
   'inspect.com': 'Center of Mass',
   'status.comDone': 'Center of mass: ({{x}}, {{y}}, {{z}})',
   'status.comNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/visibility: toggle visibility of all bodies ──
+  'view.visibility': 'Visibility',
+  'view.toggleBodies': 'Toggle Bodies',
+  'status.bodiesShown': 'All bodies shown',
+  'status.bodiesHidden': 'All bodies hidden',
 };

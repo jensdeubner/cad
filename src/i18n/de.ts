@@ -962,4 +962,9 @@ export const de: Record<string, string> = {
   'inspect.com': 'Schwerpunkt',
   'status.comDone': 'Schwerpunkt: ({{x}}, {{y}}, {{z}})',
   'status.comNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/visibility: Sichtbarkeit aller Körper umschalten ──
+  'view.visibility': 'Sichtbarkeit',
+  'view.toggleBodies': 'Körper an/aus',
+  'status.bodiesShown': 'Alle Körper eingeblendet',
+  'status.bodiesHidden': 'Alle Körper ausgeblendet',
 };
