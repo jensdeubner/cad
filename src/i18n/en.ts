@@ -921,4 +921,10 @@ export const en: Record<string, string> = {
   'status.viewSaved': 'View saved',
   'status.viewRestored': 'View restored',
   'status.noSavedView': 'No saved view — use "Save View" first',
+  // ── feat/measure: 3D measurement tool ──
+  'inspect.measure': 'Measure',
+  'status.measureDone': 'Diagonal {{d}} mm',
+  'status.measureNoBody': 'No active body — load geometry or create a primitive first',
+  'status.measurePick': 'Measure: click two surface points in the 3D view',
+  'status.measurePoint2': 'Measure: click the second point',
 };
