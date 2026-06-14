@@ -88,6 +88,7 @@ import {
   dropConstraintsForContour,
   remapConstraintsAfterPointDelete,
   remapConstraintsAfterPointInsert,
+  sketchDegreesOfFreedom,
   solveSketchConstraints,
   type SketchConstraint,
   type SketchConstraintKind,
@@ -99,6 +100,14 @@ import {
   contourPointsFromUV,
   type SketchConstraintApi,
 } from './sketch-mode/constraints';
+import {
+  buildConstraintGlyphGroup,
+  computeGlyphAnchors,
+  disposeConstraintGlyphGroup,
+  pickConstraintGlyphAt,
+  updateConstraintGlyphScales,
+  type GlyphAnchor,
+} from './sketch-mode/constraint-glyphs';
 import { bindFusionKeyboard, renderFusionShortcutsPanel } from './input/fusion-keyboard';
 import { collectScanPointsOnPlane, planeIntersectsScan, pointHitsScan } from './scan-hit';
 import {
@@ -380,6 +389,9 @@ let sketchConstraintKind: SketchConstraintKind = 'coincident';
 let sketchDims!: SketchDimensionApi;
 /** Sketch constraint controller — initialized alongside sketchDims. */
 let sketchConstraintTool: SketchConstraintApi | null = null;
+/** Current constraint glyph anchors (for screen-space picking). */
+let constraintGlyphAnchors: GlyphAnchor[] = [];
+let selectedConstraintId: string | null = null;
 
 function sketchUI(id: string) {
   if (!sketchBrowserUI.has(id)) sketchBrowserUI.set(id, { expanded: true });
@@ -1306,6 +1318,11 @@ sketchConstraintGroup.name = 'sketch-constraint-picks';
 sketchConstraintGroup.visible = false;
 scene.add(sketchConstraintGroup);
 
+const sketchConstraintGlyphGroup = new THREE.Group();
+sketchConstraintGlyphGroup.name = 'sketch-constraint-glyphs';
+sketchConstraintGlyphGroup.visible = false;
+scene.add(sketchConstraintGlyphGroup);
+
 let workPlaneMesh = makeWorkPlaneMesh('xy', 0, 200);
 scene.add(workPlaneMesh);
 
@@ -1539,6 +1556,7 @@ function closeActiveSketch() {
   sketchDims.rebuild();
   sketchDims.refreshList();
   sketchConstraintTool?.refreshList();
+  rebuildConstraintGlyphs();
   updateSketchRibbonState(null, 'sketch-pick');
 }
 
@@ -1843,6 +1861,8 @@ function beginSketchOnPlane(axis: PlaneAxis, position = 0) {
   refreshWorkPlaneMesh(getPlaneHitVisual());
   updateHitFeedback();
   sketchDims.refreshList();
+  sketchConstraintTool?.refreshList();
+  rebuildConstraintGlyphs();
   refreshBrowserPanel();
   updateSketchRibbonState(activeSketchId, tool);
   setStatus(t('status.sketchOnAxis', { axis: axis.toUpperCase() }));
@@ -1864,6 +1884,8 @@ function activateSketch(sketchId: string) {
   refreshWorkPlaneMesh(getPlaneHitVisual());
   updateHitFeedback();
   sketchDims.refreshList();
+  sketchConstraintTool?.refreshList();
+  rebuildConstraintGlyphs();
   refreshBrowserPanel();
   updateSketchRibbonState(activeSketchId, tool);
   setStatus(t('status.sketchActive', { label: sk.label }));
@@ -2088,6 +2110,7 @@ sketchConstraintTool = createSketchConstraintApi({
   getPickGroup: () => sketchConstraintGroup,
   pushUndo: (label?: string) => pushUndo(label),
   solveActiveSketch: () => solveActiveSketchConstraints(),
+  rebuildGlyphs: () => rebuildConstraintGlyphs(),
   rebuildContourLines,
   setStatus,
   t,
@@ -2436,7 +2459,49 @@ function solveActiveSketchConstraints(): SketchSolveResult {
     rebuildContourLines();
     sketchDims.rebuild();
   }
+  rebuildConstraintGlyphs();
   return res;
+}
+
+/** Rebuild the constraint glyph badges for the active sketch (clears when none). */
+function rebuildConstraintGlyphs() {
+  sketchConstraintGlyphGroup.children.slice().forEach((child) => {
+    disposeConstraintGlyphGroup(child);
+    child.removeFromParent();
+  });
+  constraintGlyphAnchors = [];
+  if (!activeSketchId) {
+    selectedConstraintId = null;
+    sketchConstraintGlyphGroup.visible = false;
+    updateConstraintStateReadout();
+    return;
+  }
+  const active = sketchConstraints.filter((c) => c.sketchId === activeSketchId);
+  constraintGlyphAnchors = computeGlyphAnchors(active, contours, planeAxis, planePosition);
+  if (selectedConstraintId && !constraintGlyphAnchors.some((a) => a.constraintId === selectedConstraintId)) {
+    selectedConstraintId = null;
+  }
+  const vh = renderer.domElement.clientHeight || 800;
+  sketchConstraintGlyphGroup.add(
+    buildConstraintGlyphGroup(constraintGlyphAnchors, camera, vh, selectedConstraintId),
+  );
+  sketchConstraintGlyphGroup.visible = constraintGlyphAnchors.length > 0;
+  updateConstraintStateReadout();
+}
+
+/** Update the under/fully/over-constrained readout in the sketch panel. */
+function updateConstraintStateReadout() {
+  const el = document.getElementById('sketch-constraint-state');
+  if (!el) return;
+  if (!activeSketchId) {
+    el.textContent = '';
+    el.style.color = '';
+    return;
+  }
+  const dof = sketchDegreesOfFreedom(contours, sketchConstraints, activeSketchId);
+  el.textContent = t(`sketchConstraint.state.${dof.state}`, { dof: dof.remaining });
+  el.style.color =
+    dof.state === 'full' ? '#22c55e' : dof.state === 'over' ? '#f59e0b' : dof.state === 'under' ? '#6ea8ff' : '';
 }
 
 function getSelectedContour(): Contour | null {
@@ -2703,6 +2768,7 @@ function deleteBrowserItem(id: BrowserItemId) {
     sketchConstraints = dropConstraintsForContour(sketchConstraints, cid);
     sketchConstraintTool?.clearPending();
     sketchConstraintTool?.refreshList();
+    rebuildConstraintGlyphs();
     const obj = drawGroup.getObjectByName(cid);
     if (obj) {
       obj.removeFromParent();
@@ -2851,6 +2917,7 @@ function restoreSnapshot(snap: ReturnType<typeof snapshotNow>) {
   sketchDims.refreshList();
   sketchConstraintTool?.clearPending();
   sketchConstraintTool?.refreshList();
+  rebuildConstraintGlyphs();
   updateSketchRibbonState(activeSketchId, tool);
   syncToolButtons(tool);
   onBodyTransformChanged();
@@ -4078,6 +4145,7 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   sketchDims.refreshList();
   sketchConstraintTool?.clearPending();
   sketchConstraintTool?.refreshList();
+  rebuildConstraintGlyphs();
   refreshBrowserPanel();
   updateSketchRibbonState(activeSketchId, tool);
   syncToolButtons(tool);
@@ -4498,6 +4566,7 @@ function refreshContourList() {
       sketchConstraints = dropConstraintsForContour(sketchConstraints, c.id);
       sketchConstraintTool?.clearPending();
       sketchConstraintTool?.refreshList();
+      rebuildConstraintGlyphs();
       if (selectedContourId === c.id) selectContour(null);
       const obj = drawGroup.getObjectByName(c.id);
       if (obj) {
@@ -4689,6 +4758,7 @@ function handleEditPointerDown(e: PointerEvent) {
     sketchConstraintTool?.refreshList();
     selectContour(c.id, idx);
     rebuildContourLines();
+    rebuildConstraintGlyphs();
     setStatus(t('status.pointInserted', { count: c.points.length }));
     return;
   }
@@ -4727,6 +4797,7 @@ function handleEditPointerDown(e: PointerEvent) {
   sketchConstraintTool?.refreshList();
   selectContour(c.id, idx);
   rebuildContourLines();
+  rebuildConstraintGlyphs();
   setStatus(t('status.pointInsertedMenu'));
 }
 
@@ -4772,6 +4843,7 @@ function applyPointMenuAction(action: string) {
     sketchConstraintTool?.refreshList();
     selectContour(c.id, idx);
     rebuildContourLines();
+    rebuildConstraintGlyphs();
     setStatus(t('status.pointDuplicated'));
   }
   hidePointMenu();
@@ -4853,6 +4925,10 @@ function setTool(next: Tool, opts?: { skipWorkspaceCheck?: boolean }) {
   }
   if (next !== 'sketch-constraint') {
     sketchConstraintTool?.clearPending();
+    if (selectedConstraintId) {
+      selectedConstraintId = null;
+      rebuildConstraintGlyphs();
+    }
   }
   if (next !== 'lasso') {
     lassoScreen = [];
@@ -5098,6 +5174,18 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   }
   if (tool === 'sketch-constraint' && activeSketchId && e.button === 0) {
     e.preventDefault();
+    const gid = pickConstraintGlyphAt(constraintGlyphAnchors, e.clientX, e.clientY, renderer.domElement, camera);
+    if (gid) {
+      selectedConstraintId = gid;
+      sketchConstraintTool?.clearPending();
+      rebuildConstraintGlyphs();
+      setStatus(t('status.sketchConstraintSelected'));
+      return;
+    }
+    if (selectedConstraintId) {
+      selectedConstraintId = null;
+      rebuildConstraintGlyphs();
+    }
     sketchConstraintTool?.handlePointerDown(e.clientX, e.clientY);
     return;
   }
@@ -5582,6 +5670,7 @@ function clearAllContours() {
   sketchDims.refreshList();
   sketchConstraintTool?.clearPending();
   sketchConstraintTool?.refreshList();
+  rebuildConstraintGlyphs();
   refreshContourList();
   updateSketchRibbonState(null, 'sketch-pick');
   if (workspaceMode === 'sketch') setTool('sketch-pick', { skipWorkspaceCheck: true });
@@ -5987,6 +6076,17 @@ window.addEventListener('keydown', (e) => {
     void tryCommitLoft(loftHost);
     return;
   }
+  if (
+    (e.key === 'Delete' || e.key === 'Backspace') &&
+    !isTypingTarget(e.target) &&
+    activeSketchId &&
+    selectedConstraintId
+  ) {
+    e.preventDefault();
+    sketchConstraintTool?.deleteConstraint(selectedConstraintId);
+    selectedConstraintId = null;
+    return;
+  }
   if (e.key === 'Shift' && !shiftKeyHeld) {
     shiftKeyHeld = true;
     syncOrbitControls();
@@ -6033,6 +6133,9 @@ function animate() {
   syncOrbitControls();
   controls.update();
   if (activeSketchId && sketchDimGroup.visible) sketchDims.updateScreenScales();
+  if (sketchConstraintGlyphGroup.visible) {
+    updateConstraintGlyphScales(sketchConstraintGlyphGroup, camera, renderer.domElement.clientHeight || 800);
+  }
   syncAttachedContourDisplay();
   renderer.render(scene, camera);
   viewCube.render();
@@ -6151,6 +6254,20 @@ async function boot() {
     // ── #11 sketch constraint test bridge ──
     sketchConstraintCount: () => sketchConstraints.length,
     activeSketchConstraintCount: () => (sketchConstraintTool ? sketchConstraintTool.activeCount() : 0),
+    constraintGlyphCount: () => constraintGlyphAnchors.length,
+    sketchConstraintState: () =>
+      activeSketchId ? sketchDegreesOfFreedom(contours, sketchConstraints, activeSketchId).state : 'empty',
+    selectedConstraintId: () => selectedConstraintId,
+    constraintGlyphScreenAt: (index: number) => {
+      const a = constraintGlyphAnchors[index];
+      if (!a) return null;
+      const v = a.position.clone().project(camera);
+      const rect = renderer.domElement.getBoundingClientRect();
+      return {
+        x: (v.x * 0.5 + 0.5) * rect.width + rect.left,
+        y: (-v.y * 0.5 + 0.5) * rect.height + rect.top,
+      };
+    },
     contourPointAt: (contourId: string, index: number) => {
       const c = contours.find((x) => x.id === contourId);
       if (!c || index < 0 || index >= c.points.length) return null;
@@ -6181,6 +6298,11 @@ async function boot() {
       return c ? c.id : null;
     },
     deleteLastSketchConstraint: () => (sketchConstraintTool ? sketchConstraintTool.deleteLast() : false),
+    activateSketchById: (id: string) => {
+      activateSketch(id);
+      return activeSketchId;
+    },
+    deleteContourById: (id: string) => deleteBrowserItem(`contour:${id}`),
     solveActiveSketch: () => solveActiveSketchConstraints(),
   };
 }

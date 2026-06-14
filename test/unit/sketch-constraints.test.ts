@@ -10,6 +10,7 @@ import {
   remapConstraintsAfterPointDelete,
   remapConstraintsAfterPointInsert,
   requiredPointCount,
+  sketchDegreesOfFreedom,
   solveSketchConstraints,
   type SketchConstraint,
 } from '../../src/sketch/sketch-constraints';
@@ -281,5 +282,59 @@ describe('solveSketchConstraints (#11 live binding)', () => {
     expect(constraintRefsValid([c], con('coincident', [['z', 0], ['z', 1]]))).toBe(true);
     expect(constraintRefsValid([c], con('coincident', [['z', 0], ['z', 9]]))).toBe(false);
     expect(constraintRefsValid([c], con('coincident', [['z', 0]]))).toBe(false); // too few refs
+  });
+});
+
+describe('sketchDegreesOfFreedom', () => {
+  it('reports "empty" for a sketch with no points', () => {
+    const dof = sketchDegreesOfFreedom([], [], 's1');
+    expect(dof.state).toBe('empty');
+    expect(dof.freeDof).toBe(0);
+  });
+
+  it('reports "under" with the remaining DOF count', () => {
+    const c = contourFromUV([[0, 0], [5, 3]], { id: 'a', closed: false }); // 2 pts -> 4 DOF
+    const dof = sketchDegreesOfFreedom([c], [con('horizontal', [['a', 0], ['a', 1]])], 's1'); // -1
+    expect(dof.points).toBe(2);
+    expect(dof.freeDof).toBe(4);
+    expect(dof.equations).toBe(1);
+    expect(dof.remaining).toBe(3);
+    expect(dof.state).toBe('under');
+  });
+
+  it('reports "full" for a fully-constrained rectangle (8 DOF, 8 equations)', () => {
+    const c = contourFromUV([[0, 0], [10, 0], [10, 5], [0, 5]], { id: 'r' }); // 4 pts -> 8 DOF
+    const dof = sketchDegreesOfFreedom([c], [
+      con('fix', [['r', 0]], { target: [0, 0] }), // 2
+      con('horizontal', [['r', 0], ['r', 1]]), // 1
+      con('vertical', [['r', 1], ['r', 2]]), // 1
+      con('horizontal', [['r', 2], ['r', 3]]), // 1
+      con('vertical', [['r', 3], ['r', 0]]), // 1
+      con('distance', [['r', 0], ['r', 1]], { value: 10 }), // 1
+      con('distance', [['r', 1], ['r', 2]], { value: 5 }), // 1
+    ], 's1');
+    expect(dof.equations).toBe(8);
+    expect(dof.remaining).toBe(0);
+    expect(dof.state).toBe('full');
+  });
+
+  it('reports "over" once equations exceed free DOF', () => {
+    const c = contourFromUV([[0, 0], [5, 0]], { id: 'a', closed: false }); // 4 DOF
+    const dof = sketchDegreesOfFreedom([c], [
+      con('fix', [['a', 0]], { target: [0, 0] }), // 2
+      con('fix', [['a', 1]], { target: [5, 0] }), // 2
+      con('horizontal', [['a', 0], ['a', 1]]), // 1 -> total 5 > 4
+    ], 's1');
+    expect(dof.state).toBe('over');
+    expect(dof.remaining).toBeLessThan(0);
+  });
+
+  it('ignores constraints with broken refs and constraints of other sketches', () => {
+    const c = contourFromUV([[0, 0], [5, 0]], { id: 'a', closed: false });
+    const other = { ...con('horizontal', [['a', 0], ['a', 1]]), sketchId: 'other' };
+    const broken = con('horizontal', [['a', 0], ['a', 9]]);
+    const dof = sketchDegreesOfFreedom([c], [other, broken], 's1');
+    expect(dof.equations).toBe(0);
+    expect(dof.state).toBe('under');
   });
 });

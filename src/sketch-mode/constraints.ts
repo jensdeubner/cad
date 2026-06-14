@@ -43,6 +43,8 @@ export interface SketchConstraintHost {
   pushUndo(label?: string): void;
   /** Run the solver on the active sketch and redraw contour geometry. */
   solveActiveSketch(): SketchSolveResult;
+  /** Rebuild the constraint glyph badges (after add/delete). */
+  rebuildGlyphs(): void;
   rebuildContourLines(): void;
   setStatus(msg: string): void;
   t(key: string, params?: Record<string, string | number>): string;
@@ -248,10 +250,16 @@ export function createSketchConstraintApi(host: SketchConstraintHost): SketchCon
   }
 
   function deleteConstraint(id: string) {
-    if (!host.getSketchConstraints().some((c) => c.id === id)) return;
+    if (!host.getSketchConstraints().some((c) => c.id === id)) {
+      // Selection pointed at an already-removed constraint — resync the glyphs
+      // so any stale highlight is cleared.
+      host.rebuildGlyphs();
+      return;
+    }
     host.pushUndo(host.t('undo.sketchConstraintDelete'));
     host.setSketchConstraints(host.getSketchConstraints().filter((c) => c.id !== id));
     refreshList();
+    host.rebuildGlyphs();
     host.setStatus(host.t('status.sketchConstraintDeleted'));
   }
 

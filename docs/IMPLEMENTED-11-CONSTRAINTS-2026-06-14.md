@@ -60,6 +60,26 @@ mit dem vorhandenen `sketch-dim-kind`-Muster).
 `test/unit/sketch-constraint-tool.test.ts`, erweiterte `project-file.test.ts` / `cad-scene-undo.test.ts` /
 `workspace-tools.test.ts` / `app-util.test.ts`, E2E `test/e2e/sketch-constraints.spec.ts`.
 
+## Visuelle Vollendung (Glyphen · Bestimmtheits-Indikator · Auswahl/Löschen)
+
+Aufbauend auf der Live-Verdrahtung wurde #11 visuell „rund" gemacht (`src/sketch-mode/constraint-glyphs.ts`):
+
+- **Constraint-Glyphen:** pixelgroße Badge-Sprites an der Geometrie (H · V · ∥ · ⊥ · ⊙ koinzident ·
+  ⚓ fix · Abstandswert), kamerabezogen skaliert im Render-Loop, kolokierte Badges werden auseinander­
+  gerückt. `computeGlyphAnchors()` ist rein (positionslogik unit-getestet); der Sprite-Bau läuft im E2E.
+- **Bestimmtheits-Indikator:** `sketchDegreesOfFreedom()` schätzt Freiheitsgrade (2·Punkte − Residuen­
+  gleichungen gültiger Zwänge) → „unterbestimmt (n FG) / vollständig bestimmt / überbestimmt", farbig im
+  Skizzen-Panel. Heuristik (kein Rang/Redundanz-Check), bewusst als Schätzung dokumentiert.
+- **Auswahl + Löschen im Viewport:** Glyph anklicken (im Zwang-Werkzeug) wählt den Zwang aus (Highlight),
+  Entf/Backspace löscht ihn. `pickConstraintGlyphAt()` (Screen-Space) unit-getestet.
+
+Der Glyph-Overlay wird konsistent neu aufgebaut bei: Solve, Add/Delete, Punkt-Insert/Delete, Kontur-
+Löschung, Skizze öffnen/wechseln/schließen, Restore/Load/Alles-Löschen. Eine zweite adversariale Review
+(15 bestätigt / 3 widerlegt) deckte fehlende Rebuilds auf den Insert-, Kontur-Lösch- und Sketch-Wechsel-
+Pfaden auf — alle gefixt und mit E2E (Kontur-Löschung, Sketch-Wechsel, Glyph-Select+Delete) abgesichert.
+
+Verifikation nach der visuellen Erweiterung: typecheck 0 · vitest **1107** · build ok · Playwright **66/66**.
+
 ## Bekannte Grenzen (bewusst)
 
 - Bemaßungs-Overlays (`SketchDimension`) verfolgen Punktbewegungen durch den Solver erst beim nächsten

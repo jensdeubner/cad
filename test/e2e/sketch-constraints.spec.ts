@@ -37,6 +37,8 @@ test('#11 sketch constraints: solves a rough quad into a 10×5 rectangle (bridge
 
   expect(await cadDebug<number>(page, 'sketchConstraintCount')).toBe(7);
   expect(await cadDebug<number>(page, 'activeSketchConstraintCount')).toBe(7);
+  // Every constraint gets a visual badge glyph.
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(7);
 
   const solve = await cadDebug<{ converged: boolean; maxResidual: number }>(page, 'solveActiveSketch');
   expect(solve.converged).toBe(true);
@@ -123,6 +125,7 @@ test('#11 sketch constraints: parallel across two contours, then delete drops th
   await cadDebug(page, 'addSketchConstraint', 'fix', [r(a, 1)]);
   await cadDebug(page, 'addSketchConstraint', 'parallel', [r(a, 0), r(a, 1), r(b, 0), r(b, 1)]);
   expect(await cadDebug<number>(page, 'sketchConstraintCount')).toBe(3);
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(3);
 
   // a is horizontal and fixed → parallel forces edge b horizontal (equal y).
   const b0 = (await cadDebug<Vec3>(page, 'contourPointAt', b, 0))!;
@@ -132,6 +135,85 @@ test('#11 sketch constraints: parallel across two contours, then delete drops th
   // Delete the last constraint via the panel-list delete path (bridge).
   expect(await cadDebug<boolean>(page, 'deleteLastSketchConstraint')).toBe(true);
   expect(await cadDebug<number>(page, 'sketchConstraintCount')).toBe(2);
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(2);
+
+  expectNoConsoleErrors(guard);
+});
+
+test('#11 sketch constraints: select a glyph in the viewport and delete it with Del', async ({ page }) => {
+  const guard = await bootApp(page);
+  expect(await cadDebug<string | null>(page, 'beginSketchOnAxis', 'xy')).toBeTruthy();
+  const c = (await cadDebug<string | null>(page, 'addSketchContourUV', [[0, 0], [5, 3]], false))!;
+  await cadDebug(page, 'addSketchConstraint', 'horizontal', [
+    { contourId: c, pointIndex: 0 },
+    { contourId: c, pointIndex: 1 },
+  ]);
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(1);
+
+  // Activate the constraint tool, then click the glyph badge to select it.
+  await selectTab(page, 'sketch');
+  await page.locator('[data-tool="sketch-constraint"]').click();
+  const s = (await cadDebug<{ x: number; y: number }>(page, 'constraintGlyphScreenAt', 0))!;
+  await page.mouse.click(s.x, s.y);
+  expect(await cadDebug<string | null>(page, 'selectedConstraintId')).toBeTruthy();
+
+  // Delete key removes the selected constraint (and its glyph).
+  await page.keyboard.press('Delete');
+  await page.waitForFunction(
+    () => (window as unknown as { __cadDebug: { sketchConstraintCount: () => number } }).__cadDebug.sketchConstraintCount() === 0,
+    undefined,
+    { timeout: 4000 },
+  );
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(0);
+  expect(await cadDebug<string | null>(page, 'selectedConstraintId')).toBeNull();
+
+  expectNoConsoleErrors(guard);
+});
+
+test('#11 sketch constraints: deleting a contour drops its constraints and glyphs', async ({ page }) => {
+  const guard = await bootApp(page);
+  expect(await cadDebug<string | null>(page, 'beginSketchOnAxis', 'xy')).toBeTruthy();
+  const a = (await cadDebug<string | null>(page, 'addSketchContourUV', [[0, 0], [5, 0]], false))!;
+  const b = (await cadDebug<string | null>(page, 'addSketchContourUV', [[0, 2], [5, 2]], false))!;
+  const r = (cid: string, i: number): Ref => ({ contourId: cid, pointIndex: i });
+  await cadDebug(page, 'addSketchConstraint', 'horizontal', [r(a, 0), r(a, 1)]);
+  await cadDebug(page, 'addSketchConstraint', 'parallel', [r(a, 0), r(a, 1), r(b, 0), r(b, 1)]);
+  expect(await cadDebug<number>(page, 'sketchConstraintCount')).toBe(2);
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(2);
+
+  // Deleting contour b drops the parallel (references b); the horizontal (only a) stays.
+  await cadDebug(page, 'deleteContourById', b);
+  expect(await cadDebug<number>(page, 'sketchConstraintCount')).toBe(1);
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(1);
+
+  expectNoConsoleErrors(guard);
+});
+
+test('#11 sketch constraints: glyphs follow the active sketch when switching', async ({ page }) => {
+  const guard = await bootApp(page);
+  const s1 = (await cadDebug<string | null>(page, 'beginSketchOnAxis', 'xy'))!;
+  const c1 = (await cadDebug<string | null>(page, 'addSketchContourUV', [[0, 0], [5, 0]], false))!;
+  await cadDebug(page, 'addSketchConstraint', 'horizontal', [
+    { contourId: c1, pointIndex: 0 },
+    { contourId: c1, pointIndex: 1 },
+  ]);
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(1);
+
+  // Creating a second sketch switches the active sketch — sketch 1's glyphs must clear.
+  const s2 = (await cadDebug<string | null>(page, 'beginSketchOnAxis', 'xz'))!;
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(0);
+  const c2 = (await cadDebug<string | null>(page, 'addSketchContourUV', [[0, 0], [4, 0]], false))!;
+  await cadDebug(page, 'addSketchConstraint', 'vertical', [
+    { contourId: c2, pointIndex: 0 },
+    { contourId: c2, pointIndex: 1 },
+  ]);
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(1);
+
+  // Switching back and forth shows exactly the active sketch's glyphs.
+  await cadDebug(page, 'activateSketchById', s1);
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(1);
+  await cadDebug(page, 'activateSketchById', s2);
+  expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(1);
 
   expectNoConsoleErrors(guard);
 });

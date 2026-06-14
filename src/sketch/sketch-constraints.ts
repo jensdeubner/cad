@@ -84,6 +84,57 @@ export function constraintRefsValid(contours: Contour[], c: SketchConstraint): b
   return true;
 }
 
+/** Residual-equation count each constraint kind contributes (for DOF estimate). */
+const CONSTRAINT_EQUATIONS: Record<SketchConstraintKind, number> = {
+  coincident: 2,
+  horizontal: 1,
+  vertical: 1,
+  parallel: 1,
+  perpendicular: 1,
+  distance: 1,
+  fix: 2,
+};
+
+export type ConstraintState = 'empty' | 'under' | 'full' | 'over';
+
+export interface SketchDofEstimate {
+  points: number;
+  freeDof: number;
+  equations: number;
+  remaining: number;
+  state: ConstraintState;
+}
+
+/**
+ * Estimate the degrees-of-freedom state of a sketch: free DOF (2 per sketch
+ * point) minus the residual equations of its valid constraints. This is a
+ * count-based estimate (it does not detect redundant/dependent constraints via
+ * rank), enough for an under/fully/over-constrained indicator.
+ */
+export function sketchDegreesOfFreedom(
+  contours: Contour[],
+  constraints: SketchConstraint[],
+  sketchId: string,
+): SketchDofEstimate {
+  const points = contours
+    .filter((c) => c.sketchId === sketchId)
+    .reduce((sum, c) => sum + c.points.length, 0);
+  const freeDof = 2 * points;
+  let equations = 0;
+  for (const sc of constraints) {
+    if (sc.sketchId !== sketchId) continue;
+    if (!constraintRefsValid(contours, sc)) continue;
+    equations += CONSTRAINT_EQUATIONS[sc.kind];
+  }
+  const remaining = freeDof - equations;
+  let state: ConstraintState;
+  if (points === 0) state = 'empty';
+  else if (remaining > 0) state = 'under';
+  else if (remaining === 0) state = 'full';
+  else state = 'over';
+  return { points, freeDof, equations, remaining, state };
+}
+
 /** Drop every constraint that references a (now deleted) contour. */
 export function dropConstraintsForContour(
   constraints: SketchConstraint[],

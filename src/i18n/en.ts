@@ -891,6 +891,11 @@ export const en: Record<string, string> = {
   'status.sketchConstraintPick': '{{kind}}: point {{have}}/{{need}} selected',
   'status.sketchConstraintPickAgain': 'Pick a different point',
   'status.sketchConstraintCancelled': 'Constraint selection cancelled',
+  'status.sketchConstraintSelected': 'Constraint selected — Del to remove',
+  'sketchConstraint.state.empty': 'Sketch empty',
+  'sketchConstraint.state.under': 'Under-constrained — {{dof}} DOF',
+  'sketchConstraint.state.full': 'Fully constrained',
+  'sketchConstraint.state.over': 'Over-constrained',
   // ── #16: offset construction plane ──
   'construct.planes': 'Construction Planes',
   'construct.planeXY': 'Offset Plane XY',

@@ -892,6 +892,11 @@ export const de: Record<string, string> = {
   'status.sketchConstraintPick': '{{kind}}: Punkt {{have}}/{{need}} gewählt',
   'status.sketchConstraintPickAgain': 'Anderen Punkt wählen',
   'status.sketchConstraintCancelled': 'Zwangs-Auswahl abgebrochen',
+  'status.sketchConstraintSelected': 'Zwang ausgewählt — Entf zum Löschen',
+  'sketchConstraint.state.empty': 'Skizze leer',
+  'sketchConstraint.state.under': 'Unterbestimmt — {{dof}} Freiheitsgrad(e)',
+  'sketchConstraint.state.full': 'Vollständig bestimmt',
+  'sketchConstraint.state.over': 'Überbestimmt',
   // ── #16: Offset-Konstruktionsebene ──
   'construct.planes': 'Konstruktionsebenen',
   'construct.planeXY': 'Offset-Ebene XY',
