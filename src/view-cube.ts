@@ -160,6 +160,21 @@ export class ViewCube {
     canvas.addEventListener('pointermove', (e) => this.onPointerMove(e));
     canvas.addEventListener('pointerup', (e) => this.onPointerUp(e));
     canvas.addEventListener('pointercancel', (e) => this.onPointerUp(e));
+    canvas.addEventListener('pointerleave', () => this.setHoveredFace(-1));
+  }
+
+  private hoveredIndex = -1;
+
+  /** Brighten the face under the cursor for tactile feedback. */
+  private setHoveredFace(index: number) {
+    if (index === this.hoveredIndex) return;
+    this.hoveredIndex = index;
+    const materials = this.cube.material as THREE.MeshStandardMaterial[];
+    materials.forEach((mat, i) => {
+      const on = i === index;
+      mat.emissive.setHex(on ? 0x6ea8ff : 0x000000);
+      mat.emissiveIntensity = on ? 0.45 : 1;
+    });
   }
 
   setFocus(center: THREE.Vector3, dist: number) {
@@ -240,7 +255,14 @@ export class ViewCube {
   }
 
   private onPointerMove(e: PointerEvent) {
+    if (this.pointerId === null) {
+      // not pressed → hover feedback
+      const preset = this.presetAtPointer(e);
+      this.setHoveredFace(preset ? BOX_FACE_PRESETS.indexOf(preset) : -1);
+      return;
+    }
     if (this.pointerId !== e.pointerId) return;
+    this.setHoveredFace(-1);
     e.stopPropagation();
     const dx = e.clientX - this.pointerDownX;
     const dy = e.clientY - this.pointerDownY;

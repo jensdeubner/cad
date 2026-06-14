@@ -231,8 +231,12 @@ import {
   applyHeightColors,
   applyNormalColors,
   brightenColor,
+  studioGridColors,
+  envIntensityFor,
   type ScanDisplayMode,
 } from './scan-visual';
+import { createStudioEnvironment, gradientStops, makeGradientTexture } from './scene/environment';
+import { createInfiniteGrid, niceGridStep } from './scene/grid';
 
 const HIT_MARKER_COLOR = 0xffee00;
 
@@ -417,16 +421,30 @@ let editDrag: {
 let pointMenuTarget: { contourId: string; pointIndex: number } | null = null;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(SCAN_THEMES.cad.background);
 
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100000);
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  alpha: false,
+  preserveDrawingBuffer: true, // allow canvas.toDataURL() view export / thumbnails
+});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.localClippingEnabled = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = SCAN_THEMES.cad.toneExposure;
 renderer.domElement.style.touchAction = 'none';
 viewport.appendChild(renderer.domElement);
+
+// Tone-mapped studio gradient background + image-based lighting (PMREM).
+function applySceneBackground(theme = SCAN_THEMES[bodyDisplayMode]) {
+  const tex = makeGradientTexture(gradientStops(theme.background));
+  const prev = scene.background;
+  scene.background = tex;
+  if (prev && (prev as THREE.Texture).isTexture) (prev as THREE.Texture).dispose();
+}
+applySceneBackground(SCAN_THEMES.cad);
+const studioEnv = createStudioEnvironment(renderer);
+scene.environment = studioEnv.texture;
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -476,15 +494,31 @@ const fill = new THREE.DirectionalLight(0xe8ecf0, SCAN_THEMES.cad.fillIntensity)
 fill.position.set(-4, 2, -3);
 scene.add(ambient, hemi, dir, fill);
 
-const grid = new THREE.GridHelper(
-  200,
-  20,
-  SCAN_THEMES.cad.grid[0],
-  SCAN_THEMES.cad.grid[1],
-);
+const infiniteGrid = createInfiniteGrid({ colors: studioGridColors(SCAN_THEMES.cad) });
+const grid = infiniteGrid.mesh; // kept name for visibility toggles
 scene.add(grid);
 
+/** Re-tune the infinite floor grid for the current model size + theme. */
+function configureFloorGrid(
+  theme = SCAN_THEMES[bodyDisplayMode],
+  size = cadScene.size > 1 ? cadScene.size : EMPTY_PROJECT_VIEW_SIZE,
+) {
+  const cell = niceGridStep(size);
+  infiniteGrid.configure({
+    cellSize: cell,
+    sectionSize: cell * 10,
+    fadeNear: size * 1.3,
+    fadeFar: size * 5,
+    colors: studioGridColors(theme),
+  });
+  const c = cadScene.bounds.getCenter(new THREE.Vector3());
+  infiniteGrid.setCenter(c.x, c.z);
+}
+
 const axes = new THREE.AxesHelper(30);
+(axes.material as THREE.LineBasicMaterial).transparent = true;
+(axes.material as THREE.LineBasicMaterial).opacity = 0.55;
+(axes.material as THREE.LineBasicMaterial).depthWrite = false;
 scene.add(axes);
 
 const cadScene = new CadScene(scene);
@@ -1580,14 +1614,7 @@ function setupEmptyProjectView() {
 
   viewCube.setFocus(origin, dist);
 
-  const theme = SCAN_THEMES.cad;
-  (grid.geometry as THREE.BufferGeometry).dispose();
-  grid.geometry = new THREE.GridHelper(
-    EMPTY_PROJECT_VIEW_SIZE * 2,
-    40,
-    theme.grid[0],
-    theme.grid[1],
-  ).geometry;
+  configureFloorGrid(SCAN_THEMES.cad, EMPTY_PROJECT_VIEW_SIZE);
   grid.position.set(0, 0, 0);
   grid.visible = browserState.gridVisible;
   axes.scale.setScalar(EMPTY_PROJECT_VIEW_SIZE / 30);
@@ -1635,7 +1662,7 @@ function disposeOriginPlaneNode(node: THREE.Object3D) {
       mat.dispose();
       return;
     }
-    if (child instanceof THREE.Mesh) {
+    if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
       child.geometry.dispose();
       (child.material as THREE.Material).dispose();
     }
@@ -1667,24 +1694,38 @@ function updateOriginPlaneHighlight(
   const emphasize = pickMode || isEmptyProject();
 
   originPlanesGroup.traverse((child) => {
-    if (!(child instanceof THREE.Mesh) || !child.name.startsWith('origin-plane-')) return;
-    const axis = parseOriginPlaneName(child.name);
+    const isBorder = child instanceof THREE.LineSegments && child.name.startsWith('origin-plane-border-');
+    const isFill = child instanceof THREE.Mesh && child.name.startsWith('origin-plane-');
+    if (!isBorder && !isFill) return;
+    const axis = child.name.startsWith('origin-plane-border-')
+      ? (child.name.slice('origin-plane-border-'.length) as PlaneAxis)
+      : parseOriginPlaneName(child.name);
     if (!axis) return;
-    const mat = child.material as THREE.MeshBasicMaterial;
+    const mat = (child as THREE.Mesh | THREE.LineSegments).material as
+      | THREE.MeshBasicMaterial
+      | THREE.LineBasicMaterial;
     const isActive = axis === activeAxis;
     const isHover = axis === hoverAxis;
 
+    if (isBorder) {
+      mat.color.setHex(
+        isActive ? 0xffffff : brightenColor(ORIGIN_PLANE_COLORS[axis], isHover ? 1.25 : 1),
+      );
+      mat.opacity = isActive ? 1 : isHover ? 0.95 : activeAxis ? 0.4 : emphasize ? 0.85 : 0.6;
+      return;
+    }
+
     if (isActive) {
-      mat.opacity = 0.52;
+      mat.opacity = 0.4;
       mat.color.setHex(0xffffff);
     } else if (isHover) {
-      mat.opacity = 0.46;
+      mat.opacity = 0.36;
       mat.color.setHex(brightenColor(ORIGIN_PLANE_COLORS[axis], 1.12));
     } else if (activeAxis) {
-      mat.opacity = 0.1;
+      mat.opacity = 0.07;
       mat.color.setHex(ORIGIN_PLANE_COLORS[axis]);
     } else {
-      mat.opacity = emphasize ? 0.34 : 0.24;
+      mat.opacity = emphasize ? 0.24 : 0.16;
       mat.color.setHex(ORIGIN_PLANE_COLORS[axis]);
     }
   });
@@ -2137,10 +2178,7 @@ function fitCameraToBox(box: THREE.Box3) {
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
 
-  grid.scale.setScalar(Math.ceil(cadScene.size / 10));
-  (grid.geometry as THREE.BufferGeometry).dispose();
-  const theme = SCAN_THEMES[bodyDisplayMode];
-  grid.geometry = new THREE.GridHelper(cadScene.size * 2, 40, theme.grid[0], theme.grid[1]).geometry;
+  configureFloorGrid();
 
   const dist = cadScene.size * 1.4;
   camera.position.set(center.x + dist, center.y + dist * 0.6, center.z + dist);
@@ -2943,13 +2981,15 @@ function refreshFestkoerperMaterial(bodyId: string) {
   fk.material = makeSolidBodyMaterial(bodyId);
 }
 
-function makeSolidBodyMaterial(bodyId: string): THREE.MeshPhongMaterial {
+function makeSolidBodyMaterial(bodyId: string): THREE.MeshPhysicalMaterial {
   const base = new THREE.Color(getBodySolidColor(bodyId));
-  return new THREE.MeshPhongMaterial({
+  return new THREE.MeshPhysicalMaterial({
     color: base,
-    emissive: base.clone().multiplyScalar(0.12),
-    shininess: 28,
-    specular: 0x333333,
+    metalness: 0.12,
+    roughness: 0.34,
+    clearcoat: 0.55,
+    clearcoatRoughness: 0.28,
+    envMapIntensity: envIntensityFor(SCAN_THEMES[bodyDisplayMode]),
     side: THREE.DoubleSide,
     transparent: false,
     opacity: 1,
@@ -3035,7 +3075,7 @@ function applyScanTheme(mode: ScanDisplayMode, brightness = bodyBrightness) {
   bodyBrightness = brightness;
   const theme = SCAN_THEMES[mode];
 
-  (scene.background as THREE.Color).setHex(theme.background);
+  applySceneBackground(theme);
   ambient.intensity = theme.ambient * brightness;
   hemi.color.setHex(theme.hemiSky);
   hemi.groundColor.setHex(theme.hemiGround);
@@ -3044,10 +3084,7 @@ function applyScanTheme(mode: ScanDisplayMode, brightness = bodyBrightness) {
   fill.intensity = theme.fillIntensity * brightness;
   renderer.toneMappingExposure = theme.toneExposure * (0.92 + brightness * 0.12);
 
-  const gridSize =
-    cadScene.size > 1 ? cadScene.size * 2 : EMPTY_PROJECT_VIEW_SIZE * 2;
-  (grid.geometry as THREE.BufferGeometry).dispose();
-  grid.geometry = new THREE.GridHelper(gridSize, 40, theme.grid[0], theme.grid[1]).geometry;
+  configureFloorGrid(theme);
 
   const activeTraceOn = isTraceAssistOn(ab().id);
   const { solid, wire, points } = getBodyMeshParts(ab());
@@ -3170,7 +3207,7 @@ async function promoteMeshToNewBody(
   },
   labelPrefix: string,
   opts?: {
-    tab?: 'solid' | 'body' | 'contours';
+    tab?: FusionTab;
     workspace?: WorkspaceMode;
     bodyKind?: BodyKind;
     featureKind?: FeatureKind;
@@ -3238,12 +3275,15 @@ function showSolidPreview(mesh: { positions: Float32Array; indices: Uint32Array 
   geom.computeVertexNormals();
   const solid = new THREE.Mesh(
     geom,
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshPhysicalMaterial({
       color: 0x5eb3ff,
       transparent: true,
-      opacity: 0.52,
-      metalness: 0.08,
-      roughness: 0.55,
+      opacity: 0.5,
+      metalness: 0.1,
+      roughness: 0.4,
+      clearcoat: 0.4,
+      clearcoatRoughness: 0.3,
+      envMapIntensity: 1.1,
       side: THREE.DoubleSide,
       depthWrite: false,
     }),
@@ -5372,8 +5412,8 @@ document.getElementById('slice-axis')!.addEventListener('change', updateSlice);
 document.getElementById('slice-pos')!.addEventListener('input', updateSlice);
 
 document.getElementById('grid-size')!.addEventListener('input', (e: Event) => {
-  const step = parseInt((e.target as HTMLInputElement).value);
-  grid.scale.setScalar(step);
+  const step = Math.max(1, parseInt((e.target as HTMLInputElement).value) || 1);
+  infiniteGrid.configure({ cellSize: step, sectionSize: step * 10 });
 });
 
 function findBodyIdForObject(obj: THREE.Object3D): string | null {

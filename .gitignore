@@ -56,3 +56,6 @@ coverage/
 
 # --- Sonstiges ---
 *.local
+# local screenshot scratch (visual sweep)
+.shots/
+.playwright-mcp/

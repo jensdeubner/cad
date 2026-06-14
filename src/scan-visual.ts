@@ -21,26 +21,57 @@ export interface ScanTheme {
   toneExposure: number;
   /** Leicht schattierte Fläche statt flacher Farbe */
   shadedSurface?: boolean;
+  /** Studio-Look: Achsenfarben des unendlichen Rasters (X = rot, Z = blau). */
+  axisX?: number;
+  axisZ?: number;
+  /** Stärke der Bild-basierten Beleuchtung (PMREM) auf PBR-Flächen. */
+  envIntensity?: number;
+}
+
+export interface InfiniteGridColors {
+  cell: number;
+  section: number;
+  axisX: number;
+  axisZ: number;
+}
+
+/** Rasterfarben (minor/major + Achsen) für den Studio-Boden je Theme. */
+export function studioGridColors(theme: ScanTheme): InfiniteGridColors {
+  return {
+    cell: theme.grid[1],
+    section: theme.grid[0],
+    axisX: theme.axisX ?? 0xff6b6b,
+    axisZ: theme.axisZ ?? 0x5a9bff,
+  };
+}
+
+/** envMapIntensity / Studio-Reflexion je Theme (Default 1). */
+export function envIntensityFor(theme: ScanTheme): number {
+  return theme.envIntensity ?? 1;
 }
 
 export const SCAN_THEMES: Record<ScanDisplayMode, ScanTheme> = {
   cad: {
-    background: 0xe4e6ea,
-    grid: [0x8a9199, 0xb8bcc4],
-    solidColor: 0xc8ccd4,
+    // Premium dark studio (Fusion 360 default is dark) — cohesive with the dark UI shell.
+    background: 0x171c26,
+    grid: [0x47546d, 0x2a3140],
+    solidColor: 0xccd2dc,
     solidOpacity: 1,
-    edgeColor: 0x0f141c,
-    edgeOpacity: 1,
+    edgeColor: 0x9ab4d8,
+    edgeOpacity: 0.92,
     edgeThreshold: 18,
     pointOpacity: 0,
-    ambient: 0.38,
-    hemiSky: 0xf2f3f5,
-    hemiGround: 0x7a8088,
-    hemiIntensity: 0.48,
-    dirIntensity: 1.45,
-    fillIntensity: 0.28,
-    toneExposure: 1.02,
+    ambient: 0.5,
+    hemiSky: 0xb8c6e0,
+    hemiGround: 0x202632,
+    hemiIntensity: 0.6,
+    dirIntensity: 1.2,
+    fillIntensity: 0.35,
+    toneExposure: 1.05,
     shadedSurface: true,
+    axisX: 0xff6b6b,
+    axisZ: 0x5a9bff,
+    envIntensity: 1.05,
   },
   kontrast: {
     background: 0xc8d0e0,
@@ -97,8 +128,8 @@ export const SCAN_THEMES: Record<ScanDisplayMode, ScanTheme> = {
     shadedSurface: true,
   },
   dunkel: {
-    background: 0x141820,
-    grid: [0x3a4458, 0x252d3a],
+    background: 0x10141c,
+    grid: [0x3a4458, 0x232b38],
     solidColor: 0xb8c0d0,
     solidOpacity: 0.45,
     edgeColor: 0x6ec8ff,
@@ -112,6 +143,9 @@ export const SCAN_THEMES: Record<ScanDisplayMode, ScanTheme> = {
     dirIntensity: 0.95,
     fillIntensity: 0.35,
     toneExposure: 0.95,
+    axisX: 0xff7a7a,
+    axisZ: 0x6ec8ff,
+    envIntensity: 0.85,
   },
 };
 
@@ -156,7 +190,7 @@ export function makeScanSolidMaterial(
 ): THREE.Material {
   const opaque = opacity >= 0.98;
   if (theme.shadedSurface) {
-    return new THREE.MeshLambertMaterial({
+    return new THREE.MeshStandardMaterial({
       color: solidColor,
       vertexColors: useVertexColors,
       transparent: !opaque,
@@ -164,6 +198,9 @@ export function makeScanSolidMaterial(
       side: THREE.DoubleSide,
       clippingPlanes,
       depthWrite: opaque || opacity > 0.45,
+      roughness: 0.62,
+      metalness: 0.04,
+      envMapIntensity: envIntensityFor(theme),
     });
   }
   return new THREE.MeshBasicMaterial({

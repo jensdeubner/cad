@@ -1,13 +1,23 @@
 :root {
   --bg: #0f1115;
   --panel: #171b22;
+  --panel-glass: rgba(20, 25, 34, 0.82);
   --border: #2a3140;
+  --border-soft: rgba(108, 124, 158, 0.16);
   --text: #e8edf7;
   --muted: #8b95a8;
   --accent: #4da3ff;
+  --accent-strong: #6eb4ff;
+  --accent-soft: rgba(77, 163, 255, 0.16);
+  --accent-glow: rgba(77, 163, 255, 0.45);
   --accent-2: #ffb347;
   --danger: #ff6b6b;
   --grid: #1e2430;
+  --radius: 10px;
+  --radius-sm: 7px;
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-2: 0 12px 34px rgba(0, 0, 0, 0.42);
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 * { box-sizing: border-box; }
@@ -1948,4 +1958,157 @@ kbd {
   width: 100%;
   font-size: 13px;
   padding: 10px 8px;
+}
+
+/* ============================================================
+   STUDIO POLISH — cohesive accent, glass, depth & motion
+   ============================================================ */
+
+/* Cinematic vignette over the 3D canvas (adds depth, sits below UI). */
+.viewport-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 50% 42%, transparent 55%, rgba(6, 9, 14, 0.28) 100%);
+  mix-blend-mode: multiply;
+}
+
+/* Keep interactive overlays above the vignette. */
+.tool-hint,
+.transform-toolbar,
+.view-cube-host,
+.sketch-dim-hud,
+.viewport-menu,
+.floating-panel,
+.browser-context-menu,
+#draw-overlay {
+  z-index: 6;
+}
+.view-cube-host { z-index: 8; }
+.floating-panel { z-index: 14; }
+.viewport-menu,
+.browser-context-menu { z-index: 20; }
+.sketch-dim-hud { z-index: 30; }
+
+/* Unified focus ring for keyboard users. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
+}
+button:focus:not(:focus-visible) { outline: none; }
+
+/* Tabs: smoother active glow on the unified accent. */
+.fusion-tabs button {
+  transition: background 0.18s var(--ease), color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+.fusion-tabs button.active {
+  background: linear-gradient(180deg, #16263c 0%, #101826 100%);
+  box-shadow:
+    inset 0 2px 0 var(--accent),
+    0 0 18px -6px var(--accent-glow);
+}
+
+/* Quick + ribbon buttons: lift on hover, crisp active glow. */
+.quick-btn,
+.ribbon-btn {
+  transition:
+    background 0.16s var(--ease),
+    border-color 0.16s var(--ease),
+    box-shadow 0.16s var(--ease),
+    transform 0.12s var(--ease);
+}
+.quick-btn:hover,
+.ribbon-btn:hover {
+  box-shadow: 0 4px 14px -8px var(--accent-glow);
+}
+.ribbon-btn.active {
+  box-shadow:
+    inset 0 0 0 1px var(--accent-soft),
+    0 0 16px -7px var(--accent-glow);
+}
+.ribbon-primary {
+  box-shadow: 0 6px 18px -10px var(--accent-glow);
+}
+
+/* Brand mark: subtle living glow. */
+.brand-mark {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 16px -4px var(--accent-glow);
+}
+
+/* Glassmorphism for floating surfaces. */
+.floating-panel,
+.viewport-menu,
+.browser-context-menu,
+.body-color-menu {
+  background: var(--panel-glass);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border-color: var(--border-soft);
+  box-shadow: var(--shadow-2);
+}
+
+/* View cube host: lift it onto a soft glass pedestal on hover. */
+.view-cube-host {
+  border-radius: 12px;
+  transition: filter 0.2s var(--ease), background 0.2s var(--ease);
+}
+.view-cube-host:hover {
+  background: rgba(20, 25, 34, 0.35);
+  filter: drop-shadow(0 8px 20px rgba(15, 23, 42, 0.4));
+}
+
+/* Browser tree: active body/sketch get an accent rail. */
+.browser-body.is-active-body,
+.browser-sketch.is-active-sketch {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.browser-sketch.is-active-sketch {
+  box-shadow: inset 2px 0 0 #ffd966;
+}
+
+/* Timeline active step: stronger but on-brand glow. */
+.timeline-step-active {
+  box-shadow:
+    0 0 0 1px rgba(96, 165, 250, 0.4),
+    0 4px 16px -6px var(--accent-glow);
+}
+
+/* Status bar: hairline accent on top for a finished edge. */
+#status {
+  border-top: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(108, 124, 158, 0.08);
+}
+
+/* Refined thin scrollbars across panels. */
+.browser-tree::-webkit-scrollbar,
+.fp-body::-webkit-scrollbar,
+.fusion-tabs::-webkit-scrollbar,
+.fusion-ribbon::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.browser-tree::-webkit-scrollbar-thumb,
+.fp-body::-webkit-scrollbar-thumb,
+.fusion-tabs::-webkit-scrollbar-thumb,
+.fusion-ribbon::-webkit-scrollbar-thumb {
+  background: rgba(108, 124, 158, 0.28);
+  border-radius: 999px;
+}
+.browser-tree::-webkit-scrollbar-thumb:hover,
+.fp-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(108, 124, 158, 0.5);
+}
+
+/* Honour reduced-motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

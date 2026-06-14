@@ -82,34 +82,71 @@ function makeOriginPlaneLabel(axis: PlaneAxis, size: number): THREE.Sprite {
   return sprite;
 }
 
+function orientOriginNode(node: THREE.Object3D, axis: PlaneAxis): void {
+  if (axis === 'xy') {
+    node.position.set(0, 0, 0);
+  } else if (axis === 'xz') {
+    node.rotation.x = -Math.PI / 2;
+  } else {
+    node.rotation.y = Math.PI / 2;
+  }
+}
+
 export function makeOriginPlaneMesh(axis: PlaneAxis, size: number): THREE.Mesh {
   const geom = new THREE.PlaneGeometry(size, size, 1, 1);
   const mat = new THREE.MeshBasicMaterial({
     color: ORIGIN_PLANE_COLORS[axis],
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.18,
     side: THREE.DoubleSide,
     depthWrite: false,
   });
   const mesh = new THREE.Mesh(geom, mat);
   mesh.name = ORIGIN_PLANE_NAMES[axis];
   mesh.renderOrder = 4;
-  if (axis === 'xy') {
-    mesh.position.set(0, 0, 0);
-  } else if (axis === 'xz') {
-    mesh.rotation.x = -Math.PI / 2;
-  } else {
-    mesh.rotation.y = Math.PI / 2;
-  }
+  orientOriginNode(mesh, axis);
   return mesh;
 }
 
-/** Fusion-Style: Ebene + Beschriftung als anklickbare Gruppe. */
+/** Leuchtender Rahmen, damit die Ebene auf dunklem Studio-Hintergrund „pops". */
+export function makeOriginPlaneBorder(axis: PlaneAxis, size: number): THREE.LineSegments {
+  const h = size / 2;
+  const corners = [
+    [-h, -h],
+    [h, -h],
+    [h, h],
+    [-h, h],
+  ];
+  const verts: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const a = corners[i];
+    const b = corners[(i + 1) % 4];
+    verts.push(a[0], a[1], 0, b[0], b[1], 0);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  const border = new THREE.LineSegments(
+    geom,
+    new THREE.LineBasicMaterial({
+      color: ORIGIN_PLANE_COLORS[axis],
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+    }),
+  );
+  border.name = `origin-plane-border-${axis}`;
+  border.renderOrder = 5;
+  orientOriginNode(border, axis);
+  return border;
+}
+
+/** Fusion-Style: Ebene + Rahmen + Beschriftung als anklickbare Gruppe. */
 export function makeOriginPlaneGroup(axis: PlaneAxis, size: number): THREE.Group {
   const group = new THREE.Group();
   group.name = `origin-plane-group-${axis}`;
   const mesh = makeOriginPlaneMesh(axis, size);
   group.add(mesh);
+  group.add(makeOriginPlaneBorder(axis, size));
   const label = makeOriginPlaneLabel(axis, size);
   label.position.set(0, 0, 0.4);
   group.add(label);

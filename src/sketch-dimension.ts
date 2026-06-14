@@ -710,7 +710,9 @@ export function applyDimensionValueToContour(
 
   const circle = circleCenter2D(contour);
   if (!circle) return false;
-  const targetRadius = pick.kind === 'diameter' ? targetMeasured / 2 : targetMeasured;
+  // measuredMmForDisplay() already converts a typed diameter to its radius,
+  // so targetMeasured is the radius for both 'radius' and 'diameter' picks.
+  const targetRadius = targetMeasured;
   if (targetRadius < 1e-6) return false;
   const frame = sketchPlaneFrame(contour.axis, contour.position);
   const [cu, cv] = projectToSketch2D(circle.center, frame);
