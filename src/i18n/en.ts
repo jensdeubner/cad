@@ -873,6 +873,11 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/separate: split disconnected shells into bodies ──
+  'mesh.separate': 'Separate bodies',
+  'status.separateDone': 'Separated into {{count}} bodies',
+  'status.separateOne': 'Only one connected shell — nothing to separate',
+  'status.separateNoBody': 'No active body — load geometry or create a primitive first',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',

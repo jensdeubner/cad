@@ -874,6 +874,11 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/separate: split disconnected shells into bodies ──
+  'mesh.separate': 'Körper trennen',
+  'status.separateDone': 'In {{count}} Körper getrennt',
+  'status.separateOne': 'Nur eine zusammenhängende Schale — nichts zu trennen',
+  'status.separateNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',

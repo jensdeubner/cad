@@ -40,6 +40,7 @@ import './solid-plane-cut';
 import './solid-sphere-body';
 import './io-ply-export';
 import './construct-plane';
+import './mesh-separate';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
