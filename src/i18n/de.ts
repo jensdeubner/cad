@@ -882,4 +882,13 @@ export const de: Record<string, string> = {
   'solid.cylinder': 'Zylinder',
   'solid.sphere': 'Kugel',
   'status.primitiveCreated': '{{label}} erstellt',
+  // ── feat/views: Look At + benannte Ansichten ──
+  'view.camera': 'Kamera',
+  'view.lookAt': 'Ausrichten',
+  'view.save': 'Ansicht speichern',
+  'view.restore': 'Ansicht laden',
+  'status.lookAtDone': 'Kamera auf aktiven Körper ausgerichtet',
+  'status.viewSaved': 'Ansicht gespeichert',
+  'status.viewRestored': 'Ansicht geladen',
+  'status.noSavedView': 'Keine gespeicherte Ansicht — zuerst „Ansicht speichern“',
 };
