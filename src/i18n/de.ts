@@ -874,6 +874,11 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/visual-style: Darstellungsstil (Wireframe ↔ Schattiert) ──
+  'view.style': 'Darstellung',
+  'view.wireframe': 'Drahtgitter',
+  'status.wireframeOn': 'Drahtgitter-Darstellung aktiv',
+  'status.wireframeOff': 'Schattierte Darstellung aktiv',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'OBJ exportieren',

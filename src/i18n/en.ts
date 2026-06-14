@@ -873,6 +873,11 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/visual-style: Display style (wireframe ↔ shaded) ──
+  'view.style': 'Display Style',
+  'view.wireframe': 'Wireframe',
+  'status.wireframeOn': 'Wireframe display active',
+  'status.wireframeOff': 'Shaded display active',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'Export OBJ',
