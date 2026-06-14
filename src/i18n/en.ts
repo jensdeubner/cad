@@ -987,4 +987,9 @@ export const en: Record<string, string> = {
   'solid.scaleFactor': 'Scale ×',
   'status.scaleFactorDone': 'Body scaled ×1.5 about bounding-box center',
   'status.scaleFactorNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/obj-import: OBJ import ──
+  'io.import': 'Import',
+  'io.objImport': 'Import OBJ',
+  'status.objImportDone': 'OBJ imported — {{tris}} triangles',
+  'status.objImportEmpty': 'OBJ empty or invalid — no body created',
 };
