@@ -874,6 +874,11 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/mesh-hole-fill (#21) ──
+  'mesh.holeFill': 'Löcher füllen',
+  'status.holeFillDone': '{{count}} Loch/Löcher gefüllt (+{{tris}} Dreiecke)',
+  'status.holeFillNone': 'Keine Löcher gefunden — Netz ist geschlossen',
+  'status.holeFillNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',

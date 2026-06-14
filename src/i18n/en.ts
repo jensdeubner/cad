@@ -873,6 +873,11 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/mesh-hole-fill (#21) ──
+  'mesh.holeFill': 'Fill holes',
+  'status.holeFillDone': 'Filled {{count}} hole(s) (+{{tris}} triangles)',
+  'status.holeFillNone': 'No holes found — mesh is already closed',
+  'status.holeFillNoBody': 'No active body — load geometry or create a primitive first',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',
