@@ -874,6 +874,10 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── #33: Remesh (refine to target edge length) ──
+  'mesh.remesh': 'Neu vernetzen',
+  'status.remeshDone': 'Neu vernetzt: {{before}} → {{after}} Dreiecke',
+  'status.remeshNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',
