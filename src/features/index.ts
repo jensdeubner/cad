@@ -7,6 +7,7 @@
  * so parallel branches auto-merge.
  */
 import './solid-primitives';
+import './inspect-section';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

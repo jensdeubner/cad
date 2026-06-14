@@ -881,4 +881,8 @@ export const en: Record<string, string> = {
   'solid.cylinder': 'Cylinder',
   'solid.sphere': 'Sphere',
   'status.primitiveCreated': '{{label}} created',
+  // ── inspect-section: Section Analysis ──
+  'view.section': 'Section',
+  'status.sectionOn': 'Section plane active',
+  'status.sectionOff': 'Section plane off',
 };
