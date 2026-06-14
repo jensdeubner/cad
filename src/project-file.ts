@@ -5,9 +5,10 @@ import { migrateContourAttachment } from './contour-body';
 import type { SketchDimensionKind, SketchUnit } from './sketch-dimension';
 import type { SketchConstraintKind } from './sketch/sketch-constraints';
 import type { ContourPointType, PlaneAxis } from './types';
+import { type FeatureRecipe, cloneFeatureRecipe } from './feature-recipe';
 
 export const PROJECT_EXTENSION = '.stpr';
-export const PROJECT_VERSION = 7;
+export const PROJECT_VERSION = 8;
 
 export type { BodyKind };
 
@@ -97,6 +98,7 @@ export interface ProjectMeta {
   sketches?: ProjectSketch[];
   sketchDimensions?: ProjectSketchDimension[];
   sketchConstraints?: ProjectSketchConstraint[];
+  featureRecipes?: FeatureRecipe[];
   sketchUnit?: SketchUnit;
   activeSketchId?: string | null;
   /** @deprecated v1/v2 */
@@ -117,6 +119,7 @@ export function buildProjectMeta(input: {
   sketches?: ProjectSketch[];
   sketchDimensions?: ProjectSketchDimension[];
   sketchConstraints?: ProjectSketchConstraint[];
+  featureRecipes?: FeatureRecipe[];
   sketchUnit?: SketchUnit;
   activeSketchId?: string | null;
 }): ProjectMeta {
@@ -143,6 +146,7 @@ export function buildProjectMeta(input: {
       refs: c.refs.map((r) => ({ ...r })),
       target: c.target ? ([c.target[0], c.target[1]] as [number, number]) : undefined,
     })),
+    featureRecipes: input.featureRecipes?.map(cloneFeatureRecipe),
     sketchUnit: input.sketchUnit ?? 'mm',
     activeSketchId: input.activeSketchId ?? null,
   };
@@ -202,13 +206,22 @@ function ensureSketchConstraints(data: ProjectMeta): ProjectMeta {
   return { ...data, sketchConstraints: data.sketchConstraints ?? [] };
 }
 
+function ensureFeatureRecipes(data: ProjectMeta): ProjectMeta {
+  return { ...data, featureRecipes: data.featureRecipes ?? [] };
+}
+
 function migrateV6(data: ProjectMeta): ProjectMeta {
   // v6 → v7: sketch constraints introduced (none exist in v6 projects).
   return migrateV7(ensureBodyKinds({ ...data, version: 7 }));
 }
 
 function migrateV7(data: ProjectMeta): ProjectMeta {
-  return ensureSketchConstraints({ ...ensureBodyKinds(data), version: PROJECT_VERSION });
+  // v7 → v8: parametric feature recipes introduced (none exist in v7 projects).
+  return migrateV8(ensureSketchConstraints({ ...ensureBodyKinds(data), version: 8 }));
+}
+
+function migrateV8(data: ProjectMeta): ProjectMeta {
+  return ensureFeatureRecipes({ ...ensureBodyKinds(data), version: PROJECT_VERSION });
 }
 
 function migrateV2(data: ProjectMeta): ProjectMeta {
@@ -250,7 +263,8 @@ export function parseProjectMeta(json: string): ProjectMeta {
   else if (data.version === 4) meta = migrateV4(data);
   else if (data.version === 5) meta = migrateV5(data);
   else if (data.version === 6) meta = migrateV6(data);
-  else if (data.version === PROJECT_VERSION) meta = migrateV7(data);
+  else if (data.version === 7) meta = migrateV7(data);
+  else if (data.version === PROJECT_VERSION) meta = migrateV8(data);
   else throw new Error('Unbekannte Projektversion');
   if (!Array.isArray(meta.contours)) {
     throw new Error('Projektdatei unvollständig (Konturen fehlen)');

@@ -56,8 +56,8 @@ function makeContour(overrides: Partial<ProjectContour> = {}): ProjectContour {
 // ----------------------------------------------------------------------------
 
 describe('constants', () => {
-  it('PROJECT_VERSION is 7', () => {
-    expect(PROJECT_VERSION).toBe(7);
+  it('PROJECT_VERSION is 8', () => {
+    expect(PROJECT_VERSION).toBe(8);
   });
 
   it('PROJECT_EXTENSION is .stpr', () => {

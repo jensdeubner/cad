@@ -198,6 +198,7 @@ import {
   recipeIdForBody,
   recipeForBody,
   withRecipe,
+  cloneFeatureRecipe,
 } from './feature-recipe';
 import { bindHistoryTimeline } from './history-timeline';
 import { UndoHistory, captureSnapshot } from './undo';
@@ -648,6 +649,7 @@ function pushMeshUndo(label = 'Körper bearbeiten') {
       activeSketchId,
       sketchDimensions,
       sketchConstraints,
+      featureRecipes,
     ),
     label,
   );
@@ -2534,6 +2536,7 @@ function snapshotNow() {
     activeSketchId,
     sketchDimensions,
     sketchConstraints,
+    featureRecipes,
   );
 }
 
@@ -2998,6 +3001,7 @@ function restoreSnapshot(snap: ReturnType<typeof snapshotNow>) {
     b: d.b.clone(),
   }));
   sketchConstraints = (snap.sketchConstraints ?? []).map(cloneSketchConstraint);
+  featureRecipes = (snap.featureRecipes ?? []).map(cloneFeatureRecipe);
   activeSketchId = snap.activeSketchId;
   updateOriginPlaneHighlight(
     activeSketchId ? (sketches.find((s) => s.id === activeSketchId)?.axis ?? null) : null,
@@ -4067,6 +4071,7 @@ async function saveProject() {
     sketches: sketches.map((s) => ({ ...s })),
     sketchDimensions: sketchDims.dimensionsToProject(),
     sketchConstraints: sketchConstraints.map(cloneSketchConstraint),
+    featureRecipes: featureRecipes.map(cloneFeatureRecipe),
     sketchUnit,
     activeSketchId: activeSketchId ?? undefined,
   });
@@ -4125,6 +4130,7 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   sketches = [];
   sketchDimensions = [];
   sketchConstraints = [];
+  featureRecipes = [];
   activeSketchId = null;
   sketchDims.clearSession();
   updateOriginPlaneHighlight(null);
@@ -4248,6 +4254,7 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
     pointIndex1: d.pointIndex1,
   }));
   sketchConstraints = (meta.sketchConstraints ?? []).map(cloneSketchConstraint);
+  featureRecipes = (meta.featureRecipes ?? []).map(cloneFeatureRecipe);
 
   contours = meta.contours.map((c) => ({
     id: c.id,
@@ -5801,6 +5808,7 @@ function clearAllContours() {
   sketches = [];
   sketchDimensions = [];
   sketchConstraints = [];
+  featureRecipes = [];
   activeSketchId = null;
   sketchDims.clearSession();
   updateOriginPlaneHighlight(null);

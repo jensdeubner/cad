@@ -6,6 +6,7 @@ import { cloneSketchDimension, type SketchDimension } from './sketch-dimension';
 import { cloneSketchConstraint, type SketchConstraint } from './sketch/sketch-constraints';
 import type { Sketch } from './sketch';
 import type { Contour } from './types';
+import { type FeatureRecipe, cloneFeatureRecipe } from './feature-recipe';
 
 export interface AppSnapshot {
   contours: Contour[];
@@ -18,6 +19,7 @@ export interface AppSnapshot {
   sketches: Sketch[];
   sketchDimensions: SketchDimension[];
   sketchConstraints: SketchConstraint[];
+  featureRecipes?: FeatureRecipe[];
   activeSketchId: string | null;
 }
 
@@ -66,6 +68,7 @@ export function captureSnapshot(
   activeSketchId: string | null = null,
   sketchDimensions: SketchDimension[] = [],
   sketchConstraints: SketchConstraint[] = [],
+  featureRecipes: FeatureRecipe[] = [],
 ): AppSnapshot {
   const transforms: Record<string, BodyTransform> = {};
   for (const [id, t] of Object.entries(bodyTransforms)) {
@@ -89,6 +92,7 @@ export function captureSnapshot(
     sketches: sketches.map((s) => ({ ...s })),
     sketchDimensions: sketchDimensions.map(cloneSketchDimension),
     sketchConstraints: sketchConstraints.map(cloneSketchConstraint),
+    featureRecipes: featureRecipes.map(cloneFeatureRecipe),
     activeSketchId,
   };
 }
