@@ -882,4 +882,9 @@ export const de: Record<string, string> = {
   'solid.cylinder': 'Zylinder',
   'solid.sphere': 'Kugel',
   'status.primitiveCreated': '{{label}} erstellt',
+  // ── feat/mesh-reduce ──
+  'mesh.optimize': 'Optimieren',
+  'mesh.reduce': 'Reduzieren',
+  'status.reduceDone': 'Reduziert: {{before}} → {{after}} Dreiecke',
+  'status.reduceNoBody': 'Reduzieren: kein aktiver Körper mit Mesh',
 };

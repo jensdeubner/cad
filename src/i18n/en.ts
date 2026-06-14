@@ -881,4 +881,9 @@ export const en: Record<string, string> = {
   'solid.cylinder': 'Cylinder',
   'solid.sphere': 'Sphere',
   'status.primitiveCreated': '{{label}} created',
+  // ── feat/mesh-reduce ──
+  'mesh.optimize': 'Optimize',
+  'mesh.reduce': 'Reduce',
+  'status.reduceDone': 'Reduced: {{before}} → {{after}} triangles',
+  'status.reduceNoBody': 'Reduce: no active body with mesh',
 };
