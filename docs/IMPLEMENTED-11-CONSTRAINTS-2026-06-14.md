@@ -78,11 +78,22 @@ Löschung, Skizze öffnen/wechseln/schließen, Restore/Load/Alles-Löschen. Eine
 (15 bestätigt / 3 widerlegt) deckte fehlende Rebuilds auf den Insert-, Kontur-Lösch- und Sketch-Wechsel-
 Pfaden auf — alle gefixt und mit E2E (Kontur-Löschung, Sketch-Wechsel, Glyph-Select+Delete) abgesichert.
 
-Verifikation nach der visuellen Erweiterung: typecheck 0 · vitest **1107** · build ok · Playwright **66/66**.
+## Abschließender Politur-Schub
+
+- **Zwangsart-Dropdown lokalisiert** (DE/EN) über `applySketchConstraintKindOptions` (`src/i18n/dom.ts`),
+  spiegelt das `sketch-dim-kind`-Muster — EN-Nutzer sehen keine statisch-deutschen Labels mehr.
+- **Bemaßungen folgen dem Solver:** `syncDimensionsToContours` (rein, unit-getestet) führt lineare Maße
+  ihren Endpunkt-Indizes und Radius/Durchmesser dem neu berechneten Kreis nach; im Solve-Pfad vor dem
+  Neuzeichnen aufgerufen. Damit ist die zuvor dokumentierte Grenze (stale Maße) geschlossen.
+- **E2E gehärtet:** flaky `pattern-circular` pollt jetzt `triangleCount` statt sofort zu asserten;
+  neue Specs für Dim-Folgt-Solver, Sketch-Wechsel, Kontur-Löschung und Glyph-Select/Delete.
+
+Verifikation (final): typecheck 0 · vitest **1113** · build ok · Playwright **67/67 zweimal in Folge**
+(DE+EN, 0 Konsolenfehler). Zwei adversariale Review-Runden; alle echten Funde gefixt, letzte Runde 0 Funde.
 
 ## Bekannte Grenzen (bewusst)
 
-- Bemaßungs-Overlays (`SketchDimension`) verfolgen Punktbewegungen durch den Solver erst beim nächsten
-  Rebuild — wie bisher schon beim Punkt-Drag.
+- Bemaßungs-Overlays folgen jetzt dem Solver (siehe Politur-Schub); der DOF-Indikator bleibt eine
+  Zählheuristik ohne Rang-/Redundanz-Analyse.
 - Constraints sind nicht „driven" rückgekoppelt in die Bemaßungswerte; beide Systeme koexistieren.
 - Nächster Schritt optional #30: parametrisches Timeline-Replay.
