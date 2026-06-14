@@ -873,6 +873,11 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/obj-export ──
+  'io.export': 'Export',
+  'io.objExport': 'Export OBJ',
+  'status.objExportDone': 'OBJ exported: {{faces}} faces',
+  'status.objExportNoBody': 'No active body — load or create geometry first',
   // ── PR0: feature registry ──
   'feature.error': 'Feature "{{id}}" failed',
   // ── PR0: primitives ──
