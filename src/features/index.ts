@@ -17,6 +17,7 @@ import './solid-sweep';
 import './nav-views';
 import './inspect-measure';
 import './solid-intersect';
+import './solid-primitives-extra';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

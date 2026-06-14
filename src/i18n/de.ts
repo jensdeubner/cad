@@ -934,4 +934,8 @@ export const de: Record<string, string> = {
   'status.intersectEmpty': 'Schnittmenge leer — Körper überlappen sich nicht',
   'inspect.interference': 'Interferenz',
   'status.interferenceDone': 'Interferenz geprüft — Überlappung {{volume}} mm³',
+  // ── feat/primitives-extra: Weitere Grundkörper ──
+  'solid.torus': 'Torus',
+  'solid.cone': 'Kegel',
+  'solid.pyramid': 'Pyramide',
 };

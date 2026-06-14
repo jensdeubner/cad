@@ -933,4 +933,8 @@ export const en: Record<string, string> = {
   'status.intersectEmpty': 'Intersection empty — bodies do not overlap',
   'inspect.interference': 'Interference',
   'status.interferenceDone': 'Interference checked — overlap {{volume}} mm³',
+  // ── feat/primitives-extra: Further primitives ──
+  'solid.torus': 'Torus',
+  'solid.cone': 'Cone',
+  'solid.pyramid': 'Pyramid',
 };
