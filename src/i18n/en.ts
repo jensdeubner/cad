@@ -979,4 +979,8 @@ export const en: Record<string, string> = {
   'solid.duplicateBody': 'Copy',
   'status.duplicateDone': 'Body duplicated — copy inserted with offset',
   'status.duplicateNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/convex-hull: Convex Hull ──
+  'solid.convexHull': 'Convex Hull',
+  'status.convexHullDone': 'Convex hull created as a new body',
+  'status.convexHullNoBody': 'No active body — load geometry or create a primitive first',
 };

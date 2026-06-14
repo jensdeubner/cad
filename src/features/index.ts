@@ -27,6 +27,7 @@ import './view-visibility';
 import './view-isolate';
 import './solid-duplicate';
 import './solid-bbox-body';
+import './solid-convex-hull';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

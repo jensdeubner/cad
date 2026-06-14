@@ -980,4 +980,8 @@ export const de: Record<string, string> = {
   'solid.duplicateBody': 'Kopie',
   'status.duplicateDone': 'Körper dupliziert — Kopie versetzt eingefügt',
   'status.duplicateNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/convex-hull: Konvexe Hülle ──
+  'solid.convexHull': 'Konvexe Hülle',
+  'status.convexHullDone': 'Konvexe Hülle als neuer Körper erstellt',
+  'status.convexHullNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
 };
