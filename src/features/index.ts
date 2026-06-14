@@ -7,6 +7,7 @@
  * so parallel branches auto-merge.
  */
 import './solid-primitives';
+import './mesh-reverse-normal';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

@@ -881,4 +881,9 @@ export const en: Record<string, string> = {
   'solid.cylinder': 'Cylinder',
   'solid.sphere': 'Sphere',
   'status.primitiveCreated': '{{label}} created',
+  // ── Reverse Normal (Mesh) ──
+  'mesh.normals': 'Normals',
+  'mesh.reverseNormal': 'Reverse Normal',
+  'status.reverseNormalDone': 'Normals reversed — winding flipped',
+  'status.reverseNormalNoBody': 'No active body — load geometry first',
 };
