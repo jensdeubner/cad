@@ -872,4 +872,94 @@ export const de: Record<string, string> = {
   'status.dimProfileMissing': 'Profil nicht gefunden',
   'status.dimApplyFailed': 'Bemaßung konnte nicht angewendet werden',
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
+
+  // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/weld: Make Closed / Verschweißen ──
+  'mesh.repair': 'Reparatur',
+  'mesh.weld': 'Verschweißen',
+  'status.weldDone': 'Verschweißt: {{before}} → {{after}} Vertices',
+  'status.weldNoBody': 'Verschweißen: kein aktiver Körper mit Mesh',
+  // ── feat/visual-style: Darstellungsstil (Wireframe ↔ Schattiert) ──
+  'view.style': 'Darstellung',
+  'view.wireframe': 'Drahtgitter',
+  'status.wireframeOn': 'Drahtgitter-Darstellung aktiv',
+  'status.wireframeOff': 'Schattierte Darstellung aktiv',
+  // ── feat/pattern-circular ──
+  'solid.patternCircularAxis': 'Kreismuster (Achse)',
+  'solid.patternCircularBody': 'Muster',
+  'status.patternCircularDone': 'Kreismuster erstellt: {{count}} Kopien',
+  'status.patternCircularNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
+  // ── feat/mirror-plane ──
+  'solid.mirrorPlane': 'Spiegeln (Ebene)',
+  'solid.mirrorPlaneBody': 'Spiegelung',
+  'status.mirrorPlaneDone': 'Gespiegelter Körper erstellt (XZ-Ebene)',
+  'status.mirrorPlaneNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
+  // ── feat/obj-export ──
+  'io.export': 'Export',
+  'io.objExport': 'OBJ exportieren',
+  'status.objExportDone': 'OBJ exportiert: {{faces}} Flächen',
+  'status.objExportNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
+  // ── PR0: feature registry ──
+  'feature.error': 'Feature »{{id}}« fehlgeschlagen',
+  // ── PR0: Grundkörper ──
+  'solid.primitives': 'Grundkörper',
+  'solid.box': 'Quader',
+  'solid.cylinder': 'Zylinder',
+  'solid.sphere': 'Kugel',
+  'status.primitiveCreated': '{{label}} erstellt',
+  // ── Feature: 3D-Modell-Statistik ──
+  'inspect.analyze': 'Analyse',
+  'inspect.stats': 'Statistik',
+  'inspect.stats.noBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  'status.statsDone': 'Vol {{vol}} mm³ · Fläche {{area}} mm²',
+  // ── Reverse Normal (Mesh) ──
+  'mesh.normals': 'Normalen',
+  'mesh.reverseNormal': 'Normalen umkehren',
+  'status.reverseNormalDone': 'Normalen umgekehrt — Wicklung gespiegelt',
+  'status.reverseNormalNoBody': 'Kein aktiver Körper — zuerst Geometrie laden',
+  // ── feat/mesh-reduce ──
+  'mesh.optimize': 'Optimieren',
+  'mesh.reduce': 'Reduzieren',
+  'status.reduceDone': 'Reduziert: {{before}} → {{after}} Dreiecke',
+  'status.reduceNoBody': 'Reduzieren: kein aktiver Körper mit Mesh',
+  // ── inspect-section: Section Analysis ──
+  'view.section': 'Schnittansicht',
+  'status.sectionOn': 'Schnittebene aktiv',
+  'status.sectionOff': 'Schnittebene aus',
+  // ── feat/construct-axis: Konstruktionsgeometrie ──
+  'construct.geometry': 'Konstruktion',
+  'construct.axisPoint': 'Achse + Punkt',
+  'status.constructDone': 'Konstruktionsachsen und Ursprungspunkt erstellt',
+  // ── Sweep ──
+  'solid.sweepBody': 'Sweep',
+  'status.sweepDone': 'Sweep erstellt',
+  // ── feat/views: Look At + benannte Ansichten ──
+  'view.camera': 'Kamera',
+  'view.lookAt': 'Ausrichten',
+  'view.save': 'Ansicht speichern',
+  'view.restore': 'Ansicht laden',
+  'status.lookAtDone': 'Kamera auf aktiven Körper ausgerichtet',
+  'status.viewSaved': 'Ansicht gespeichert',
+  'status.viewRestored': 'Ansicht geladen',
+  'status.noSavedView': 'Keine gespeicherte Ansicht — zuerst „Ansicht speichern“',
+  // ── feat/measure: 3D-Messwerkzeug ──
+  'inspect.measure': 'Messen',
+  'status.measureDone': 'Diagonale {{d}} mm',
+  'status.measureNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  'status.measurePick': 'Messen: zwei Flächenpunkte im 3D-Fenster anklicken',
+  'status.measurePoint2': 'Messen: zweiten Punkt anklicken',
+  // ── feat/intersect: Schneiden + Interferenz ──
+  'solid.intersectBody': 'Schnittmenge',
+  'status.intersectDone': 'Schnittmenge erstellt',
+  'status.intersectEmpty': 'Schnittmenge leer — Körper überlappen sich nicht',
+  'inspect.interference': 'Interferenz',
+  'status.interferenceDone': 'Interferenz geprüft — Überlappung {{volume}} mm³',
+  // ── feat/primitives-extra: Weitere Grundkörper ──
+  'solid.torus': 'Torus',
+  'solid.cone': 'Kegel',
+  'solid.pyramid': 'Pyramide',
+  // ── feat/com-marker: Schwerpunkt + Bounding-Box ──
+  'inspect.com': 'Schwerpunkt',
+  'status.comDone': 'Schwerpunkt: ({{x}}, {{y}}, {{z}})',
+  'status.comNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
 };

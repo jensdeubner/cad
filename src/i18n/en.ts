@@ -871,4 +871,94 @@ export const en: Record<string, string> = {
   'status.dimProfileMissing': 'Profile not found',
   'status.dimApplyFailed': 'Could not apply dimension',
   'status.dimUpdated': 'Dimension updated: {{value}}',
+
+  // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/weld: Make Closed / Weld ──
+  'mesh.repair': 'Repair',
+  'mesh.weld': 'Weld',
+  'status.weldDone': 'Welded: {{before}} → {{after}} vertices',
+  'status.weldNoBody': 'Weld: no active body with mesh',
+  // ── feat/visual-style: Display style (wireframe ↔ shaded) ──
+  'view.style': 'Display Style',
+  'view.wireframe': 'Wireframe',
+  'status.wireframeOn': 'Wireframe display active',
+  'status.wireframeOff': 'Shaded display active',
+  // ── feat/pattern-circular ──
+  'solid.patternCircularAxis': 'Circular Pattern (Axis)',
+  'solid.patternCircularBody': 'Pattern',
+  'status.patternCircularDone': 'Circular pattern created: {{count}} copies',
+  'status.patternCircularNoBody': 'No active body — load or create geometry first',
+  // ── feat/mirror-plane ──
+  'solid.mirrorPlane': 'Mirror (Plane)',
+  'solid.mirrorPlaneBody': 'Mirror',
+  'status.mirrorPlaneDone': 'Mirrored body created (XZ plane)',
+  'status.mirrorPlaneNoBody': 'No active body — load or create geometry first',
+  // ── feat/obj-export ──
+  'io.export': 'Export',
+  'io.objExport': 'Export OBJ',
+  'status.objExportDone': 'OBJ exported: {{faces}} faces',
+  'status.objExportNoBody': 'No active body — load or create geometry first',
+  // ── PR0: feature registry ──
+  'feature.error': 'Feature "{{id}}" failed',
+  // ── PR0: primitives ──
+  'solid.primitives': 'Primitives',
+  'solid.box': 'Box',
+  'solid.cylinder': 'Cylinder',
+  'solid.sphere': 'Sphere',
+  'status.primitiveCreated': '{{label}} created',
+  // ── Feature: 3D model statistics ──
+  'inspect.analyze': 'Analyze',
+  'inspect.stats': 'Statistics',
+  'inspect.stats.noBody': 'No active body — load geometry or create a primitive first',
+  'status.statsDone': 'Vol {{vol}} mm³ · Area {{area}} mm²',
+  // ── Reverse Normal (Mesh) ──
+  'mesh.normals': 'Normals',
+  'mesh.reverseNormal': 'Reverse Normal',
+  'status.reverseNormalDone': 'Normals reversed — winding flipped',
+  'status.reverseNormalNoBody': 'No active body — load geometry first',
+  // ── feat/mesh-reduce ──
+  'mesh.optimize': 'Optimize',
+  'mesh.reduce': 'Reduce',
+  'status.reduceDone': 'Reduced: {{before}} → {{after}} triangles',
+  'status.reduceNoBody': 'Reduce: no active body with mesh',
+  // ── inspect-section: Section Analysis ──
+  'view.section': 'Section',
+  'status.sectionOn': 'Section plane active',
+  'status.sectionOff': 'Section plane off',
+  // ── feat/construct-axis: Construction geometry ──
+  'construct.geometry': 'Construction',
+  'construct.axisPoint': 'Axis + Point',
+  'status.constructDone': 'Construction axes and origin point created',
+  // ── Sweep ──
+  'solid.sweepBody': 'Sweep',
+  'status.sweepDone': 'Sweep created',
+  // ── feat/views: Look At + named views ──
+  'view.camera': 'Camera',
+  'view.lookAt': 'Look At',
+  'view.save': 'Save View',
+  'view.restore': 'Restore View',
+  'status.lookAtDone': 'Camera aligned to active body',
+  'status.viewSaved': 'View saved',
+  'status.viewRestored': 'View restored',
+  'status.noSavedView': 'No saved view — use "Save View" first',
+  // ── feat/measure: 3D measurement tool ──
+  'inspect.measure': 'Measure',
+  'status.measureDone': 'Diagonal {{d}} mm',
+  'status.measureNoBody': 'No active body — load geometry or create a primitive first',
+  'status.measurePick': 'Measure: click two surface points in the 3D view',
+  'status.measurePoint2': 'Measure: click the second point',
+  // ── feat/intersect: Intersect + interference ──
+  'solid.intersectBody': 'Intersection',
+  'status.intersectDone': 'Intersection created',
+  'status.intersectEmpty': 'Intersection empty — bodies do not overlap',
+  'inspect.interference': 'Interference',
+  'status.interferenceDone': 'Interference checked — overlap {{volume}} mm³',
+  // ── feat/primitives-extra: Further primitives ──
+  'solid.torus': 'Torus',
+  'solid.cone': 'Cone',
+  'solid.pyramid': 'Pyramid',
+  // ── feat/com-marker: center of mass + bounding box ──
+  'inspect.com': 'Center of Mass',
+  'status.comDone': 'Center of mass: ({{x}}, {{y}}, {{z}})',
+  'status.comNoBody': 'No active body — load geometry or create a primitive first',
 };

@@ -1,5 +1,6 @@
 mod boolean;
 mod project;
+// @wasm:modules — WASM feature agents append exactly one `mod <feature>;` line below (append-only).
 
 use js_sys::Float32Array;
 use serde::{Deserialize, Serialize};
@@ -623,6 +624,7 @@ pub fn unpack_project(data: &[u8]) -> Result<JsValue, JsValue> {
 
 pub use boolean::mesh_boolean_subtract_json;
 pub use boolean::mesh_boolean_union_json;
+// @wasm:exports — WASM feature agents append exactly one `pub use <feature>::<fn>_json;` line below (append-only).
 
 fn normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> [f32; 3] {
     let ux = b[0] - a[0];
