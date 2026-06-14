@@ -32,7 +32,7 @@ async function runMeshSeparate(host: FeatureHost): Promise<void> {
     return;
   }
 
-  host.pushUndo(host.t('mesh.separate'));
+  host.pushMeshUndo(host.t('mesh.separate'));
 
   // First shell replaces the original body in place.
   await host.replaceBodyGeometry(body.id, shells[0]);

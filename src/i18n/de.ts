@@ -889,8 +889,8 @@ export const de: Record<string, string> = {
   'view.namedSlot': 'Ansicht {{n}}',
   'view.namedDelete': 'Löschen',
   'panel.namedViews.title': 'Eigene Ansichten',
-  'status.namedViewSaved': 'Ansicht „{{name}}" gespeichert ({{count}} gesamt)',
-  'status.namedViewRestored': 'Ansicht „{{name}}" geladen',
+  'status.namedViewSaved': 'Ansicht „{{name}}“ gespeichert ({{count}} gesamt)',
+  'status.namedViewRestored': 'Ansicht „{{name}}“ geladen',
   'status.namedViewNone': 'Keine gespeicherten Ansichten',
   // ── feat/mesh-hole-fill (#21) ──
   'mesh.holeFill': 'Löcher füllen',
