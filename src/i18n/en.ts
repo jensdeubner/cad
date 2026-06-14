@@ -912,4 +912,13 @@ export const en: Record<string, string> = {
   // ── Sweep ──
   'solid.sweepBody': 'Sweep',
   'status.sweepDone': 'Sweep created',
+  // ── feat/views: Look At + named views ──
+  'view.camera': 'Camera',
+  'view.lookAt': 'Look At',
+  'view.save': 'Save View',
+  'view.restore': 'Restore View',
+  'status.lookAtDone': 'Camera aligned to active body',
+  'status.viewSaved': 'View saved',
+  'status.viewRestored': 'View restored',
+  'status.noSavedView': 'No saved view — use "Save View" first',
 };
