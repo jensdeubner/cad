@@ -874,6 +874,25 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── CAD-Skript-Konsole (LLM-getriebene Code-CAD-Ebene) ──
+  'cadscript.group': 'CAD-Skript',
+  'cadscript.open': 'Skript-Konsole',
+  'cadscript.title': 'CAD-Skript — Code ausführen',
+  'cadscript.close': 'Schließen',
+  'cadscript.examples': 'Beispiele:',
+  'cadscript.run': 'Ausführen (Strg+Enter)',
+  'cadscript.renderViews': 'Ansichten rendern',
+  'cadscript.reset': 'Leeren',
+  'cadscript.hint':
+    'Code ausführen: box/cylinder/sphere/extrude/revolve, .cut()/.fuse()/.intersect(), sdf.* mit smooth-min. emit(körper, "Name").',
+  'cadscript.cleared': 'Kontext geleert.',
+  'cadscript.opened': 'CAD-Skript-Konsole geöffnet.',
+  'cadscript.undo': 'CAD-Skript',
+  'cadscript.meshFailed': 'Körper „{{name}}" konnte nicht vernetzt werden.',
+  'cadscript.statusError': 'CAD-Skript: {{msg}}',
+  'cadscript.statusOk': 'CAD-Skript: {{n}} Körper erstellt.',
+  'cadscript.noBodies': 'Keine Körper zum Rendern — zuerst ein Skript ausführen.',
+  'cadscript.rendered': '{{n}} Ansichten gerendert.',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',

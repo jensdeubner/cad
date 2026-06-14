@@ -873,6 +873,25 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── CAD script console (LLM-driven code-CAD layer) ──
+  'cadscript.group': 'CAD Script',
+  'cadscript.open': 'Script Console',
+  'cadscript.title': 'CAD Script — run code',
+  'cadscript.close': 'Close',
+  'cadscript.examples': 'Examples:',
+  'cadscript.run': 'Run (Ctrl+Enter)',
+  'cadscript.renderViews': 'Render views',
+  'cadscript.reset': 'Clear',
+  'cadscript.hint':
+    'Run code: box/cylinder/sphere/extrude/revolve, .cut()/.fuse()/.intersect(), sdf.* with smooth-min. emit(solid, "Name").',
+  'cadscript.cleared': 'Context cleared.',
+  'cadscript.opened': 'CAD script console opened.',
+  'cadscript.undo': 'CAD script',
+  'cadscript.meshFailed': 'Body “{{name}}” could not be meshed.',
+  'cadscript.statusError': 'CAD script: {{msg}}',
+  'cadscript.statusOk': 'CAD script: {{n}} body/bodies created.',
+  'cadscript.noBodies': 'No bodies to render — run a script first.',
+  'cadscript.rendered': 'Rendered {{n}} views.',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',
