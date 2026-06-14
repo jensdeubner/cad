@@ -10,6 +10,7 @@ import './solid-primitives';
 import './inspect-model-stats';
 import './mesh-reverse-normal';
 import './mesh-reduce';
+import './inspect-section';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

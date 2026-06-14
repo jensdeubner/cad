@@ -896,4 +896,8 @@ export const en: Record<string, string> = {
   'mesh.reduce': 'Reduce',
   'status.reduceDone': 'Reduced: {{before}} → {{after}} triangles',
   'status.reduceNoBody': 'Reduce: no active body with mesh',
+  // ── inspect-section: Section Analysis ──
+  'view.section': 'Section',
+  'status.sectionOn': 'Section plane active',
+  'status.sectionOff': 'Section plane off',
 };

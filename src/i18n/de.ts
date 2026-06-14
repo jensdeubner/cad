@@ -897,4 +897,8 @@ export const de: Record<string, string> = {
   'mesh.reduce': 'Reduzieren',
   'status.reduceDone': 'Reduziert: {{before}} → {{after}} Dreiecke',
   'status.reduceNoBody': 'Reduzieren: kein aktiver Körper mit Mesh',
+  // ── inspect-section: Section Analysis ──
+  'view.section': 'Schnittansicht',
+  'status.sectionOn': 'Schnittebene aktiv',
+  'status.sectionOff': 'Schnittebene aus',
 };
