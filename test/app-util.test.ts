@@ -118,12 +118,13 @@ describe('sketch-mode/ribbon-state toolRequiresActiveSketch()', () => {
     'sketch-rect',
     'sketch-triangle',
     'sketch-dim',
+    'sketch-constraint',
     'freehand',
     'edit',
   ];
 
-  it('SKETCH_TOOLS_REQUIRE_ACTIVE has exactly 8 members', () => {
-    expect(SKETCH_TOOLS_REQUIRE_ACTIVE.size).toBe(8);
+  it('SKETCH_TOOLS_REQUIRE_ACTIVE has exactly 9 members', () => {
+    expect(SKETCH_TOOLS_REQUIRE_ACTIVE.size).toBe(9);
   });
 
   for (const tool of requiring) {

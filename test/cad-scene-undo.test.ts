@@ -51,6 +51,7 @@ function emptySnapshot(tag = 0): AppSnapshot {
     bodyTransforms: { _tag: t({ posX: tag }) },
     sketches: [],
     sketchDimensions: [],
+    sketchConstraints: [],
     activeSketchId: null,
   };
 }
@@ -458,11 +459,28 @@ describe('captureSnapshot deep-cloning', () => {
     expect(snap.bodyKinds).not.toBe(kinds);
   });
 
-  it('defaults sketches, sketchDimensions to empty and activeSketchId to null', () => {
+  it('defaults sketches, sketchDimensions, sketchConstraints to empty and activeSketchId to null', () => {
     const snap = captureSnapshot([], null, t(), {});
     expect(snap.sketches).toEqual([]);
     expect(snap.sketchDimensions).toEqual([]);
+    expect(snap.sketchConstraints).toEqual([]);
     expect(snap.activeSketchId).toBeNull();
+  });
+
+  it('deep-clones sketch constraints (refs are fresh objects)', () => {
+    const constraint = {
+      id: 'k1',
+      sketchId: 's1',
+      kind: 'distance' as const,
+      refs: [{ contourId: 'c1', pointIndex: 0 }, { contourId: 'c1', pointIndex: 1 }],
+      value: 10,
+    };
+    const snap = captureSnapshot([], null, t(), {}, undefined, undefined, [], 's1', [], [constraint]);
+    constraint.refs[0].pointIndex = 99;
+    constraint.value = 999;
+    expect(snap.sketchConstraints[0]).not.toBe(constraint);
+    expect(snap.sketchConstraints[0].refs[0].pointIndex).toBe(0);
+    expect(snap.sketchConstraints[0].value).toBe(10);
   });
 
   it('clones sketch dimensions (a/b are fresh Vector3 instances)', () => {

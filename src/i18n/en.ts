@@ -873,6 +873,24 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── #11: sketch constraint solver (live) ──
+  'ribbon.constraint': 'Constraint',
+  'sketchConstraint.kind.coincident': 'Coincident',
+  'sketchConstraint.kind.horizontal': 'Horizontal',
+  'sketchConstraint.kind.vertical': 'Vertical',
+  'sketchConstraint.kind.parallel': 'Parallel',
+  'sketchConstraint.kind.perpendicular': 'Perpendicular',
+  'sketchConstraint.kind.distance': 'Distance',
+  'sketchConstraint.kind.fix': 'Fix',
+  'sketchConstraint.delete': 'Delete constraint',
+  'undo.sketchConstraint': 'Constraint: {{kind}}',
+  'undo.sketchConstraintDelete': 'Delete constraint',
+  'status.sketchConstraintSet': 'Constraint set: {{kind}}',
+  'status.sketchConstraintOver': 'Sketch over-constrained — constraint still added',
+  'status.sketchConstraintDeleted': 'Constraint deleted',
+  'status.sketchConstraintPick': '{{kind}}: point {{have}}/{{need}} selected',
+  'status.sketchConstraintPickAgain': 'Pick a different point',
+  'status.sketchConstraintCancelled': 'Constraint selection cancelled',
   // ── #16: offset construction plane ──
   'construct.planes': 'Construction Planes',
   'construct.planeXY': 'Offset Plane XY',

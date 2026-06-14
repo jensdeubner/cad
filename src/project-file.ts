@@ -3,10 +3,11 @@ import type { BodyTransform } from './cad-scene';
 import { DEFAULT_BODY_ID, DEFAULT_COMPONENT_ID, type CadBodyId, type CadComponentId } from './cad-scene';
 import { migrateContourAttachment } from './contour-body';
 import type { SketchDimensionKind, SketchUnit } from './sketch-dimension';
+import type { SketchConstraintKind } from './sketch/sketch-constraints';
 import type { ContourPointType, PlaneAxis } from './types';
 
 export const PROJECT_EXTENSION = '.stpr';
-export const PROJECT_VERSION = 6;
+export const PROJECT_VERSION = 7;
 
 export type { BodyKind };
 
@@ -37,6 +38,15 @@ export interface ProjectSketchDimension {
   contourId?: string;
   pointIndex0?: number;
   pointIndex1?: number;
+}
+
+export interface ProjectSketchConstraint {
+  id: string;
+  sketchId: string;
+  kind: SketchConstraintKind;
+  refs: { contourId: string; pointIndex: number }[];
+  value?: number;
+  target?: [number, number];
 }
 
 export interface ProjectContour {
@@ -86,6 +96,7 @@ export interface ProjectMeta {
   contours: ProjectContour[];
   sketches?: ProjectSketch[];
   sketchDimensions?: ProjectSketchDimension[];
+  sketchConstraints?: ProjectSketchConstraint[];
   sketchUnit?: SketchUnit;
   activeSketchId?: string | null;
   /** @deprecated v1/v2 */
@@ -105,6 +116,7 @@ export function buildProjectMeta(input: {
   contours: ProjectContour[];
   sketches?: ProjectSketch[];
   sketchDimensions?: ProjectSketchDimension[];
+  sketchConstraints?: ProjectSketchConstraint[];
   sketchUnit?: SketchUnit;
   activeSketchId?: string | null;
 }): ProjectMeta {
@@ -126,6 +138,11 @@ export function buildProjectMeta(input: {
     })),
     sketches: input.sketches?.map((s) => ({ ...s })),
     sketchDimensions: input.sketchDimensions?.map((d) => ({ ...d })),
+    sketchConstraints: input.sketchConstraints?.map((c) => ({
+      ...c,
+      refs: c.refs.map((r) => ({ ...r })),
+      target: c.target ? ([c.target[0], c.target[1]] as [number, number]) : undefined,
+    })),
     sketchUnit: input.sketchUnit ?? 'mm',
     activeSketchId: input.activeSketchId ?? null,
   };
@@ -181,8 +198,17 @@ function migrateV5(data: ProjectMeta): ProjectMeta {
   return migrateV6(ensureBodyKinds({ ...data, version: 5 }));
 }
 
+function ensureSketchConstraints(data: ProjectMeta): ProjectMeta {
+  return { ...data, sketchConstraints: data.sketchConstraints ?? [] };
+}
+
 function migrateV6(data: ProjectMeta): ProjectMeta {
-  return { ...ensureBodyKinds(data), version: PROJECT_VERSION };
+  // v6 → v7: sketch constraints introduced (none exist in v6 projects).
+  return migrateV7(ensureBodyKinds({ ...data, version: 7 }));
+}
+
+function migrateV7(data: ProjectMeta): ProjectMeta {
+  return ensureSketchConstraints({ ...ensureBodyKinds(data), version: PROJECT_VERSION });
 }
 
 function migrateV2(data: ProjectMeta): ProjectMeta {
@@ -223,7 +249,8 @@ export function parseProjectMeta(json: string): ProjectMeta {
   else if (data.version === 2) meta = migrateV2(data);
   else if (data.version === 4) meta = migrateV4(data);
   else if (data.version === 5) meta = migrateV5(data);
-  else if (data.version === PROJECT_VERSION) meta = migrateV6(data);
+  else if (data.version === 6) meta = migrateV6(data);
+  else if (data.version === PROJECT_VERSION) meta = migrateV7(data);
   else throw new Error('Unbekannte Projektversion');
   if (!Array.isArray(meta.contours)) {
     throw new Error('Projektdatei unvollständig (Konturen fehlen)');

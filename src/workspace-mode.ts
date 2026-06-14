@@ -18,6 +18,7 @@ const SKETCH_ONLY_TOOLS = new Set<Tool>([
   'sketch-rect',
   'sketch-triangle',
   'sketch-dim',
+  'sketch-constraint',
 ]);
 
 const SKETCH_DRAW_TOOLS = new Set<Tool>([
@@ -27,6 +28,7 @@ const SKETCH_DRAW_TOOLS = new Set<Tool>([
   'sketch-rect',
   'sketch-triangle',
   'sketch-dim',
+  'sketch-constraint',
 ]);
 
 const BODY_ONLY_TOOLS = new Set<Tool>([

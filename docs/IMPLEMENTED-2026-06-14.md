@@ -81,7 +81,8 @@ Regressions-Test belegt.
 - **Intersect auf einem Boolean-Ergebnis** kann den WASM-Kernel in einen Trap (`unreachable`)
   führen; der `try/catch` fängt den Fehler ab (Status statt Absturz), aber das Modul kann danach
   einen Re-Init brauchen. Für saubere Operanden (Normalfall) robust.
-- Sketch-Constraint-Solver (#11) und parametrisches Timeline-Replay (#30) bleiben offen —
+- Sketch-Constraint-Solver (#11) ist inzwischen **live verdrahtet** — siehe
+  `docs/IMPLEMENTED-11-CONSTRAINTS-2026-06-14.md`. Parametrisches Timeline-Replay (#30) bleibt offen —
   tief im Sketch-/Feature-Kern verzahnt, eigenes koordiniertes Vorhaben (nicht naiv-parallelisierbar).
 
 ## Neues Feature hinzufügen

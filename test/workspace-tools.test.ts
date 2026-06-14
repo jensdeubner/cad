@@ -17,7 +17,7 @@ import {
 import type { Tool } from '../src/types';
 import type { FusionTab } from '../src/app-menu';
 
-// Exhaustive Tool union from src/types.ts (18 members).
+// Exhaustive Tool union from src/types.ts (19 members).
 const ALL_TOOLS: Tool[] = [
   'navigate',
   'align',
@@ -33,6 +33,7 @@ const ALL_TOOLS: Tool[] = [
   'sketch-rect',
   'sketch-triangle',
   'sketch-dim',
+  'sketch-constraint',
   'polyline',
   'freehand',
   'lasso',
@@ -53,9 +54,9 @@ const ALL_TABS: FusionTab[] = [
 const ALL_MODES: WorkspaceMode[] = ['sketch', 'body', 'contour'];
 
 describe('workspace-mode: union sanity', () => {
-  it('the Tool union under test has 18 distinct members', () => {
-    expect(new Set(ALL_TOOLS).size).toBe(18);
-    expect(ALL_TOOLS).toHaveLength(18);
+  it('the Tool union under test has 19 distinct members', () => {
+    expect(new Set(ALL_TOOLS).size).toBe(19);
+    expect(ALL_TOOLS).toHaveLength(19);
   });
 
   it('the FusionTab union under test has 8 distinct members', () => {
@@ -141,6 +142,7 @@ describe('toolAllowedInWorkspace — sketch mode', () => {
       'sketch-rect',
       'sketch-triangle',
       'sketch-dim',
+      'sketch-constraint',
     ];
     for (const tool of draw) {
       expect(toolAllowedInWorkspace(tool, 'sketch', null)).toBe(false);
@@ -184,6 +186,7 @@ describe('toolAllowedInWorkspace — sketch mode', () => {
       'sketch-rect',
       'sketch-triangle',
       'sketch-dim',
+      'sketch-constraint',
     ]);
     for (const tool of ALL_TOOLS) {
       expect(toolAllowedInWorkspace(tool, 'sketch', 's1')).toBe(allowed.has(tool));

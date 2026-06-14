@@ -20,6 +20,7 @@ export type Tool =
   | 'sketch-rect'
   | 'sketch-triangle'
   | 'sketch-dim'
+  | 'sketch-constraint'
   | 'polyline'
   | 'freehand'
   | 'lasso'

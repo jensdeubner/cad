@@ -83,6 +83,22 @@ import {
 } from './input/viewport-navigation';
 import { syncToolButtonHighlight, updateSketchRibbonState } from './sketch-mode/ribbon-state';
 import { createSketchDimensionApi, type SketchDimensionApi } from './sketch-mode/dimensions';
+import {
+  cloneSketchConstraint,
+  dropConstraintsForContour,
+  remapConstraintsAfterPointDelete,
+  remapConstraintsAfterPointInsert,
+  solveSketchConstraints,
+  type SketchConstraint,
+  type SketchConstraintKind,
+  type SketchPointRef,
+  type SketchSolveResult,
+} from './sketch/sketch-constraints';
+import {
+  createSketchConstraintApi,
+  contourPointsFromUV,
+  type SketchConstraintApi,
+} from './sketch-mode/constraints';
 import { bindFusionKeyboard, renderFusionShortcutsPanel } from './input/fusion-keyboard';
 import { collectScanPointsOnPlane, planeIntersectsScan, pointHitsScan } from './scan-hit';
 import {
@@ -356,10 +372,14 @@ let sketchPreviewLine: Line2 | null = null;
 let sketchInteraction: SketchInteraction | null = null;
 let hoveredOriginPlane: PlaneAxis | null = null;
 let sketchDimensions: SketchDimension[] = [];
+let sketchConstraints: SketchConstraint[] = [];
 let sketchUnit: SketchUnit = 'mm';
 let sketchDimKind: SketchDimensionKind = 'linear';
+let sketchConstraintKind: SketchConstraintKind = 'coincident';
 /** Sketch dimension controller — initialized after scene + pickSketchHit exist. */
 let sketchDims!: SketchDimensionApi;
+/** Sketch constraint controller — initialized alongside sketchDims. */
+let sketchConstraintTool: SketchConstraintApi | null = null;
 
 function sketchUI(id: string) {
   if (!sketchBrowserUI.has(id)) sketchBrowserUI.set(id, { expanded: true });
@@ -567,6 +587,7 @@ function pushMeshUndo(label = 'Körper bearbeiten') {
       sketches,
       activeSketchId,
       sketchDimensions,
+      sketchConstraints,
     ),
     label,
   );
@@ -1280,6 +1301,11 @@ sketchDimHoverGroup.name = 'sketch-dim-hover';
 sketchDimHoverGroup.visible = false;
 scene.add(sketchDimHoverGroup);
 
+const sketchConstraintGroup = new THREE.Group();
+sketchConstraintGroup.name = 'sketch-constraint-picks';
+sketchConstraintGroup.visible = false;
+scene.add(sketchConstraintGroup);
+
 let workPlaneMesh = makeWorkPlaneMesh('xy', 0, 200);
 scene.add(workPlaneMesh);
 
@@ -1504,6 +1530,7 @@ function closeActiveSketch() {
   discardIncompleteDraft(true);
   clearSketchInteraction();
   sketchDims.clearSession();
+  sketchConstraintTool?.clearPending();
   setSketchOriginSnapFeedback(false);
   activeSketchId = null;
   hoveredOriginPlane = null;
@@ -1511,6 +1538,7 @@ function closeActiveSketch() {
   updateSketchGrid();
   sketchDims.rebuild();
   sketchDims.refreshList();
+  sketchConstraintTool?.refreshList();
   updateSketchRibbonState(null, 'sketch-pick');
 }
 
@@ -2038,6 +2066,36 @@ sketchDims = createSketchDimensionApi({
   sketchDimHudApply: dom.sketchDimHudApply,
 });
 
+sketchConstraintTool = createSketchConstraintApi({
+  getActiveSketchId: () => activeSketchId,
+  getContours: () => contours,
+  getSketchConstraints: () => sketchConstraints,
+  setSketchConstraints: (cs) => {
+    sketchConstraints = cs;
+  },
+  getConstraintKind: () => sketchConstraintKind,
+  getConstraintValueMm: () => {
+    const el = document.getElementById('sketch-constraint-value') as HTMLInputElement | null;
+    if (!el) return null;
+    const v = parseFloat(el.value.replace(',', '.'));
+    return Number.isFinite(v) && v > 0 ? v : null;
+  },
+  getPlaneAxis: () => planeAxis,
+  getPlanePosition: () => planePosition,
+  getSceneSize: () => cadScene.size,
+  getRendererDom: () => renderer.domElement,
+  getCamera: () => camera,
+  getPickGroup: () => sketchConstraintGroup,
+  pushUndo: (label?: string) => pushUndo(label),
+  solveActiveSketch: () => solveActiveSketchConstraints(),
+  rebuildContourLines,
+  setStatus,
+  t,
+  onWorkflowEnd: () => {
+    syncOrbitControls();
+  },
+});
+
 function commitSketchPrimitive(points: THREE.Vector3[], closed: boolean, label: string) {
   if (points.length < 2) return;
   pushUndo(`Skizze: ${label}`);
@@ -2358,12 +2416,27 @@ function snapshotNow() {
     sketches,
     activeSketchId,
     sketchDimensions,
+    sketchConstraints,
   );
 }
 
 function pushUndo(label = 'Änderung') {
   undoHistory.push(snapshotNow(), label);
   refreshHistoryTimeline();
+}
+
+/** Run the constraint solver for the active sketch and redraw if geometry moved. */
+function solveActiveSketchConstraints(): SketchSolveResult {
+  if (!activeSketchId) {
+    return { ran: false, changed: false, converged: true, maxResidual: 0, solvedPoints: 0 };
+  }
+  const active = sketchConstraints.filter((c) => c.sketchId === activeSketchId);
+  const res = solveSketchConstraints(contours, active);
+  if (res.changed) {
+    rebuildContourLines();
+    sketchDims.rebuild();
+  }
+  return res;
 }
 
 function getSelectedContour(): Contour | null {
@@ -2627,6 +2700,9 @@ function deleteBrowserItem(id: BrowserItemId) {
     pushUndo('Kontur löschen');
     if (selectedContourId === cid) selectContour(null);
     contours = contours.filter((x) => x.id !== cid);
+    sketchConstraints = dropConstraintsForContour(sketchConstraints, cid);
+    sketchConstraintTool?.clearPending();
+    sketchConstraintTool?.refreshList();
     const obj = drawGroup.getObjectByName(cid);
     if (obj) {
       obj.removeFromParent();
@@ -2760,6 +2836,7 @@ function restoreSnapshot(snap: ReturnType<typeof snapshotNow>) {
     a: d.a.clone(),
     b: d.b.clone(),
   }));
+  sketchConstraints = (snap.sketchConstraints ?? []).map(cloneSketchConstraint);
   activeSketchId = snap.activeSketchId;
   updateOriginPlaneHighlight(
     activeSketchId ? (sketches.find((s) => s.id === activeSketchId)?.axis ?? null) : null,
@@ -2772,6 +2849,8 @@ function restoreSnapshot(snap: ReturnType<typeof snapshotNow>) {
   updateSketchGrid();
   sketchDims.rebuild();
   sketchDims.refreshList();
+  sketchConstraintTool?.clearPending();
+  sketchConstraintTool?.refreshList();
   updateSketchRibbonState(activeSketchId, tool);
   syncToolButtons(tool);
   onBodyTransformChanged();
@@ -3739,6 +3818,7 @@ function projectHasSketchData(): boolean {
     sketches.length > 0 ||
     contours.length > 0 ||
     sketchDimensions.length > 0 ||
+    sketchConstraints.length > 0 ||
     !!activeSketchId
   );
 }
@@ -3782,6 +3862,7 @@ async function saveProject() {
     contours: contoursToProject(),
     sketches: sketches.map((s) => ({ ...s })),
     sketchDimensions: sketchDims.dimensionsToProject(),
+    sketchConstraints: sketchConstraints.map(cloneSketchConstraint),
     sketchUnit,
     activeSketchId: activeSketchId ?? undefined,
   });
@@ -3839,6 +3920,7 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   contours = [];
   sketches = [];
   sketchDimensions = [];
+  sketchConstraints = [];
   activeSketchId = null;
   sketchDims.clearSession();
   updateOriginPlaneHighlight(null);
@@ -3960,6 +4042,7 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
     pointIndex0: d.pointIndex0,
     pointIndex1: d.pointIndex1,
   }));
+  sketchConstraints = (meta.sketchConstraints ?? []).map(cloneSketchConstraint);
 
   contours = meta.contours.map((c) => ({
     id: c.id,
@@ -3993,6 +4076,8 @@ async function loadProjectBuffer(buf: ArrayBuffer, fileName: string) {
   updateSketchGrid();
   sketchDims.rebuild();
   sketchDims.refreshList();
+  sketchConstraintTool?.clearPending();
+  sketchConstraintTool?.refreshList();
   refreshBrowserPanel();
   updateSketchRibbonState(activeSketchId, tool);
   syncToolButtons(tool);
@@ -4410,6 +4495,9 @@ function refreshContourList() {
     del.onclick = () => {
       pushUndo('Kontur löschen');
       contours = contours.filter((x) => x.id !== c.id);
+      sketchConstraints = dropConstraintsForContour(sketchConstraints, c.id);
+      sketchConstraintTool?.clearPending();
+      sketchConstraintTool?.refreshList();
       if (selectedContourId === c.id) selectContour(null);
       const obj = drawGroup.getObjectByName(c.id);
       if (obj) {
@@ -4597,6 +4685,8 @@ function handleEditPointerDown(e: PointerEvent) {
     pushUndo('Punkt einfügen');
     const p = storagePointFromWorldHit(target.point, c, true);
     const idx = insertPoint(c, target.segmentIndex, p);
+    sketchConstraints = remapConstraintsAfterPointInsert(sketchConstraints, c.id, idx);
+    sketchConstraintTool?.refreshList();
     selectContour(c.id, idx);
     rebuildContourLines();
     setStatus(t('status.pointInserted', { count: c.points.length }));
@@ -4633,6 +4723,8 @@ function handleEditPointerDown(e: PointerEvent) {
   pushUndo('Punkt einfügen');
   const p = worldToContourStorage(hit, c, contourWorldMatrix(c));
   const idx = insertPoint(c, ins.afterIndex, p);
+  sketchConstraints = remapConstraintsAfterPointInsert(sketchConstraints, c.id, idx);
+  sketchConstraintTool?.refreshList();
   selectContour(c.id, idx);
   rebuildContourLines();
   setStatus(t('status.pointInsertedMenu'));
@@ -4659,8 +4751,11 @@ function applyPointMenuAction(action: string) {
       hidePointMenu();
       return;
     }
+    sketchConstraints = remapConstraintsAfterPointDelete(sketchConstraints, c.id, i);
+    sketchConstraintTool?.refreshList();
     selectContour(c.id, Math.min(i, c.points.length - 1));
     rebuildContourLines();
+    solveActiveSketchConstraints();
     setStatus(t('status.pointDeleted', { count: c.points.length }));
   } else if (action === 'toggle-closed') {
     if (!c.closed && c.points.length < 3) {
@@ -4673,6 +4768,8 @@ function applyPointMenuAction(action: string) {
   } else if (action === 'insert') {
     const p = c.points[i].clone();
     const idx = insertPoint(c, i, p);
+    sketchConstraints = remapConstraintsAfterPointInsert(sketchConstraints, c.id, idx);
+    sketchConstraintTool?.refreshList();
     selectContour(c.id, idx);
     rebuildContourLines();
     setStatus(t('status.pointDuplicated'));
@@ -4753,6 +4850,9 @@ function setTool(next: Tool, opts?: { skipWorkspaceCheck?: boolean }) {
     viewport.classList.remove('sketch-dim-can-pick');
   } else if (next === 'sketch-dim') {
     setStatus(t('status.dimPick'));
+  }
+  if (next !== 'sketch-constraint') {
+    sketchConstraintTool?.clearPending();
   }
   if (next !== 'lasso') {
     lassoScreen = [];
@@ -4996,6 +5096,11 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
     }
     return;
   }
+  if (tool === 'sketch-constraint' && activeSketchId && e.button === 0) {
+    e.preventDefault();
+    sketchConstraintTool?.handlePointerDown(e.clientX, e.clientY);
+    return;
+  }
   if (activeSketchId && e.button === 0 && tool === 'navigate') {
     sketchDims.selectDimensionAt(e.clientX, e.clientY);
   }
@@ -5186,6 +5291,8 @@ window.addEventListener('pointerup', (e) => {
     if (renderer.domElement.hasPointerCapture(e.pointerId)) {
       renderer.domElement.releasePointerCapture(e.pointerId);
     }
+    // #11: re-solve the active sketch so constraints hold after a point drag.
+    solveActiveSketchConstraints();
     setStatus(t('status.contourAdjusted'));
     return;
   }
@@ -5276,6 +5383,11 @@ sketchGridSnapEl?.addEventListener('change', () => {
 document.getElementById('sketch-unit')?.addEventListener('change', (e) => {
   sketchUnit = (e.target as HTMLSelectElement).value as SketchUnit;
   sketchDims.onUnitChanged();
+});
+
+document.getElementById('sketch-constraint-kind')?.addEventListener('change', (e) => {
+  sketchConstraintKind = (e.target as HTMLSelectElement).value as SketchConstraintKind;
+  sketchConstraintTool?.clearPending();
 });
 
 sketchDims.bindUi(() => {
@@ -5454,10 +5566,12 @@ projectFile.addEventListener('change', async () => {
   projectFile.value = '';
 });
 function clearAllContours() {
-  if (contours.length || activeDraft || sketches.length || sketchDimensions.length) pushUndo('Alles löschen');
+  if (contours.length || activeDraft || sketches.length || sketchDimensions.length || sketchConstraints.length)
+    pushUndo('Alles löschen');
   contours = [];
   sketches = [];
   sketchDimensions = [];
+  sketchConstraints = [];
   activeSketchId = null;
   sketchDims.clearSession();
   updateOriginPlaneHighlight(null);
@@ -5466,6 +5580,8 @@ function clearAllContours() {
   clearDraftVisuals();
   sketchDims.rebuild();
   sketchDims.refreshList();
+  sketchConstraintTool?.clearPending();
+  sketchConstraintTool?.refreshList();
   refreshContourList();
   updateSketchRibbonState(null, 'sketch-pick');
   if (workspaceMode === 'sketch') setTool('sketch-pick', { skipWorkspaceCheck: true });
@@ -6032,6 +6148,40 @@ async function boot() {
       if (!f) return Promise.reject(new Error(`unknown feature ${id}`));
       return Promise.resolve(f.run(makeFeatureHost()));
     },
+    // ── #11 sketch constraint test bridge ──
+    sketchConstraintCount: () => sketchConstraints.length,
+    activeSketchConstraintCount: () => (sketchConstraintTool ? sketchConstraintTool.activeCount() : 0),
+    contourPointAt: (contourId: string, index: number) => {
+      const c = contours.find((x) => x.id === contourId);
+      if (!c || index < 0 || index >= c.points.length) return null;
+      const p = c.points[index];
+      return [p.x, p.y, p.z] as [number, number, number];
+    },
+    pointScreenAt: (contourId: string, index: number) => {
+      const c = contours.find((x) => x.id === contourId);
+      if (!c || index < 0 || index >= c.points.length) return null;
+      const v = c.points[index].clone().project(camera);
+      const rect = renderer.domElement.getBoundingClientRect();
+      return {
+        x: (v.x * 0.5 + 0.5) * rect.width + rect.left,
+        y: (-v.y * 0.5 + 0.5) * rect.height + rect.top,
+      };
+    },
+    beginSketchOnAxis: (axis: PlaneAxis) => {
+      beginSketchOnPlane(axis, 0);
+      return activeSketchId;
+    },
+    addSketchContourUV: (uv: [number, number][], closed: boolean) => {
+      const pts = contourPointsFromUV(uv, planeAxis, planePosition);
+      commitSketchPrimitive(pts, closed, 'Constraint-Test');
+      return contours[contours.length - 1]?.id ?? null;
+    },
+    addSketchConstraint: (kind: SketchConstraintKind, refs: SketchPointRef[], value?: number) => {
+      const c = sketchConstraintTool?.addConstraint(kind, refs, value) ?? null;
+      return c ? c.id : null;
+    },
+    deleteLastSketchConstraint: () => (sketchConstraintTool ? sketchConstraintTool.deleteLast() : false),
+    solveActiveSketch: () => solveActiveSketchConstraints(),
   };
 }
 

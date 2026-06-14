@@ -11,6 +11,7 @@ export const SKETCH_TOOLS_REQUIRE_ACTIVE: ReadonlySet<Tool> = new Set([
   'sketch-rect',
   'sketch-triangle',
   'sketch-dim',
+  'sketch-constraint',
   'freehand',
   'edit',
 ]);

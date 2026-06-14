@@ -3,6 +3,7 @@ import { cloneHandle } from './contour-spline';
 import type { BodyKind } from './body-kind';
 import type { BodyTransform } from './cad-body';
 import { cloneSketchDimension, type SketchDimension } from './sketch-dimension';
+import { cloneSketchConstraint, type SketchConstraint } from './sketch/sketch-constraints';
 import type { Sketch } from './sketch';
 import type { Contour } from './types';
 
@@ -16,6 +17,7 @@ export interface AppSnapshot {
   bodyKinds?: Record<string, BodyKind>;
   sketches: Sketch[];
   sketchDimensions: SketchDimension[];
+  sketchConstraints: SketchConstraint[];
   activeSketchId: string | null;
 }
 
@@ -63,6 +65,7 @@ export function captureSnapshot(
   sketches: Sketch[] = [],
   activeSketchId: string | null = null,
   sketchDimensions: SketchDimension[] = [],
+  sketchConstraints: SketchConstraint[] = [],
 ): AppSnapshot {
   const transforms: Record<string, BodyTransform> = {};
   for (const [id, t] of Object.entries(bodyTransforms)) {
@@ -85,6 +88,7 @@ export function captureSnapshot(
     bodyKinds: kinds,
     sketches: sketches.map((s) => ({ ...s })),
     sketchDimensions: sketchDimensions.map(cloneSketchDimension),
+    sketchConstraints: sketchConstraints.map(cloneSketchConstraint),
     activeSketchId,
   };
 }

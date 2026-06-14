@@ -234,6 +234,10 @@
                 <span class="ribbon-btn-icon">↔</span>
                 <span class="ribbon-btn-label">Bemaßung <kbd>D</kbd></span>
               </button>
+              <button type="button" data-tool="sketch-constraint" class="ribbon-btn ribbon-btn-stack" title="Zwang setzen — Punkte wählen">
+                <span class="ribbon-btn-icon">⊏</span>
+                <span class="ribbon-btn-label" data-i18n-key="ribbon.constraint">Zwang</span>
+              </button>
               <button type="button" data-open-panel="sketch" class="ribbon-btn ribbon-btn-stack" title="Skizzen-Einstellungen &amp; Bemaßungsliste">
                 <span class="ribbon-btn-icon">▤</span>
                 <span class="ribbon-btn-label" data-i18n-key="ribbon.settings">Einstellungen</span>
@@ -642,6 +646,21 @@
               </div>
               <label class="fp-row">Raster (mm) <input id="sketch-grid-spacing" type="range" min="1" max="50" value="10" /></label>
               <ul id="sketch-dim-list" class="fp-dim-list"></ul>
+              <label class="fp-row">Zwangsart
+                <select id="sketch-constraint-kind">
+                  <option value="coincident">Koinzident</option>
+                  <option value="horizontal">Horizontal</option>
+                  <option value="vertical">Vertikal</option>
+                  <option value="parallel">Parallel</option>
+                  <option value="perpendicular">Senkrecht</option>
+                  <option value="distance">Abstand (mm)</option>
+                  <option value="fix">Fixieren</option>
+                </select>
+              </label>
+              <label class="fp-row">Abstand (mm)
+                <input id="sketch-constraint-value" type="number" step="0.1" min="0.001" inputmode="decimal" placeholder="auto" />
+              </label>
+              <ul id="sketch-constraint-list" class="fp-dim-list"></ul>
               <p class="fp-hint" id="sketch-grid-spacing-val">10 mm · Einrasten aktiv</p>
               <label class="fp-check"><input id="sketch-grid-snap" type="checkbox" checked /> Am Raster &amp; Skizzenmittelpunkt einrasten</label>
               </div>

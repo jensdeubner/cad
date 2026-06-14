@@ -874,6 +874,24 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── #11: Sketch-Constraint-Solver (live) ──
+  'ribbon.constraint': 'Zwang',
+  'sketchConstraint.kind.coincident': 'Koinzident',
+  'sketchConstraint.kind.horizontal': 'Horizontal',
+  'sketchConstraint.kind.vertical': 'Vertikal',
+  'sketchConstraint.kind.parallel': 'Parallel',
+  'sketchConstraint.kind.perpendicular': 'Senkrecht',
+  'sketchConstraint.kind.distance': 'Abstand',
+  'sketchConstraint.kind.fix': 'Fixieren',
+  'sketchConstraint.delete': 'Zwang löschen',
+  'undo.sketchConstraint': 'Zwang: {{kind}}',
+  'undo.sketchConstraintDelete': 'Zwang löschen',
+  'status.sketchConstraintSet': 'Zwang gesetzt: {{kind}}',
+  'status.sketchConstraintOver': 'Skizze überbestimmt — Zwang trotzdem hinzugefügt',
+  'status.sketchConstraintDeleted': 'Zwang gelöscht',
+  'status.sketchConstraintPick': '{{kind}}: Punkt {{have}}/{{need}} gewählt',
+  'status.sketchConstraintPickAgain': 'Anderen Punkt wählen',
+  'status.sketchConstraintCancelled': 'Zwangs-Auswahl abgebrochen',
   // ── #16: Offset-Konstruktionsebene ──
   'construct.planes': 'Konstruktionsebenen',
   'construct.planeXY': 'Offset-Ebene XY',

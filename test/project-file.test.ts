@@ -8,6 +8,7 @@ import {
   type ProjectContour,
   type ProjectSketch,
   type ProjectSketchDimension,
+  type ProjectSketchConstraint,
 } from '../src/project-file';
 
 // Default ids used by the migration code.
@@ -55,8 +56,8 @@ function makeContour(overrides: Partial<ProjectContour> = {}): ProjectContour {
 // ----------------------------------------------------------------------------
 
 describe('constants', () => {
-  it('PROJECT_VERSION is 6', () => {
-    expect(PROJECT_VERSION).toBe(6);
+  it('PROJECT_VERSION is 7', () => {
+    expect(PROJECT_VERSION).toBe(7);
   });
 
   it('PROJECT_EXTENSION is .stpr', () => {
@@ -236,7 +237,7 @@ describe('parseProjectMeta version migrations', () => {
     expect(meta.components[0].bodies[0].bodyKind).toBe('loft');
   });
 
-  it('migrates v6 (current) and infers bodyKind from label "Negativform" -> loft', () => {
+  it('migrates v6 -> v7, infers bodyKind from label "Negativform" -> loft, defaults sketchConstraints to []', () => {
     const v6 = {
       version: 6,
       activeComponentId: DEFAULT_COMPONENT_ID,
@@ -254,6 +255,29 @@ describe('parseProjectMeta version migrations', () => {
     const meta = parseProjectMeta(JSON.stringify(v6));
     expect(meta.version).toBe(PROJECT_VERSION);
     expect(meta.components[0].bodies[0].bodyKind).toBe('loft');
+    // v6 projects have no constraints -> defaulted to an empty array.
+    expect(meta.sketchConstraints).toEqual([]);
+  });
+
+  it('migrates v7 (current) preserving sketch constraints', () => {
+    const constraints: ProjectSketchConstraint[] = [
+      { id: 'k1', sketchId: 'sk1', kind: 'distance', refs: [{ contourId: 'cc', pointIndex: 0 }, { contourId: 'cc', pointIndex: 1 }], value: 10 },
+      { id: 'k2', sketchId: 'sk1', kind: 'fix', refs: [{ contourId: 'cc', pointIndex: 0 }], target: [0, 0] },
+    ];
+    const v7 = {
+      version: 7,
+      activeComponentId: DEFAULT_COMPONENT_ID,
+      activeBodyId: DEFAULT_BODY_ID,
+      components: [makeComponent()],
+      planeAxis: 'xy',
+      planePosition: 0,
+      hitTolerance: 0.1,
+      contours: [makeContour({ id: 'cc' })],
+      sketchConstraints: constraints,
+    };
+    const meta = parseProjectMeta(JSON.stringify(v7));
+    expect(meta.version).toBe(PROJECT_VERSION);
+    expect(meta.sketchConstraints).toEqual(constraints);
   });
 
   it('throws for an unknown / future version', () => {
@@ -449,13 +473,41 @@ describe('buildProjectMeta', () => {
     expect(meta.sketchDimensions![0]).not.toBe(dims[0]);
   });
 
+  it('round-trips sketchConstraints with deep-cloned refs/target', () => {
+    const constraints: ProjectSketchConstraint[] = [
+      {
+        id: 'k1',
+        sketchId: 'sk1',
+        kind: 'horizontal',
+        refs: [{ contourId: 'cc', pointIndex: 0 }, { contourId: 'cc', pointIndex: 1 }],
+      },
+      {
+        id: 'k2',
+        sketchId: 'sk1',
+        kind: 'fix',
+        refs: [{ contourId: 'cc', pointIndex: 0 }],
+        target: [2, 3],
+      },
+    ];
+    const meta = buildProjectMeta({ ...baseInput(), sketchConstraints: constraints });
+    expect(meta.sketchConstraints).toEqual(constraints);
+    // deep-cloned, not aliased.
+    expect(meta.sketchConstraints![0]).not.toBe(constraints[0]);
+    expect(meta.sketchConstraints![0].refs[0]).not.toBe(constraints[0].refs[0]);
+    expect(meta.sketchConstraints![1].target).not.toBe(constraints[1].target);
+    // survives a JSON round trip
+    const reparsed = parseProjectMeta(JSON.stringify(meta));
+    expect(reparsed.sketchConstraints).toEqual(constraints);
+  });
+
   it('defaults sketchUnit to "mm" and activeSketchId to null when omitted', () => {
     const meta = buildProjectMeta(baseInput());
     expect(meta.sketchUnit).toBe('mm');
     expect(meta.activeSketchId).toBeNull();
-    // sketches/sketchDimensions omitted -> stay undefined.
+    // sketches/sketchDimensions/sketchConstraints omitted -> stay undefined.
     expect(meta.sketches).toBeUndefined();
     expect(meta.sketchDimensions).toBeUndefined();
+    expect(meta.sketchConstraints).toBeUndefined();
   });
 
   it('keeps an explicit sketchUnit and activeSketchId', () => {
