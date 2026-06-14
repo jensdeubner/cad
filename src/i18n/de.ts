@@ -892,4 +892,9 @@ export const de: Record<string, string> = {
   'mesh.reverseNormal': 'Normalen umkehren',
   'status.reverseNormalDone': 'Normalen umgekehrt — Wicklung gespiegelt',
   'status.reverseNormalNoBody': 'Kein aktiver Körper — zuerst Geometrie laden',
+  // ── feat/mesh-reduce ──
+  'mesh.optimize': 'Optimieren',
+  'mesh.reduce': 'Reduzieren',
+  'status.reduceDone': 'Reduziert: {{before}} → {{after}} Dreiecke',
+  'status.reduceNoBody': 'Reduzieren: kein aktiver Körper mit Mesh',
 };

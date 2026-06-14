@@ -891,4 +891,9 @@ export const en: Record<string, string> = {
   'mesh.reverseNormal': 'Reverse Normal',
   'status.reverseNormalDone': 'Normals reversed — winding flipped',
   'status.reverseNormalNoBody': 'No active body — load geometry first',
+  // ── feat/mesh-reduce ──
+  'mesh.optimize': 'Optimize',
+  'mesh.reduce': 'Reduce',
+  'status.reduceDone': 'Reduced: {{before}} → {{after}} triangles',
+  'status.reduceNoBody': 'Reduce: no active body with mesh',
 };
