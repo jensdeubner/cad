@@ -906,6 +906,10 @@ export const de: Record<string, string> = {
   'mesh.remesh': 'Neu vernetzen',
   'status.remeshDone': 'Neu vernetzt: {{before}} → {{after}} Dreiecke',
   'status.remeshNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/view-projection: Perspektive/Ortho-Umschalter ──
+  'view.projection': 'Projektion',
+  'status.projectionOrtho': 'Orthografische Projektion',
+  'status.projectionPersp': 'Perspektivische Projektion',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',

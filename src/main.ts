@@ -258,6 +258,7 @@ import {
   type BrowserItemId,
 } from './browser-panel';
 import { ViewCube, type ViewCubePreset } from './view-cube';
+import { orthoHalfExtents } from './nav/projection';
 import {
   SCAN_THEMES,
   SOLID_BODY_STRIDE_MAX,
@@ -494,7 +495,12 @@ const featureOverlay = new THREE.Group();
 featureOverlay.name = 'feature-overlay';
 scene.add(featureOverlay);
 
-const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100000);
+const perspectiveCamera = new THREE.PerspectiveCamera(55, 1, 0.1, 100000);
+const orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100000);
+/** The active render + pick camera. Swapped by setCameraProjection(). */
+let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = perspectiveCamera;
+/** Current projection mode of the active camera. */
+let cameraProjection: 'perspective' | 'orthographic' = 'perspective';
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
   alpha: false,
@@ -1381,11 +1387,57 @@ function updateLineResolutions() {
   }
 }
 
+/**
+ * Reframe the orthographic camera so it reproduces the perspective camera's
+ * current framing at the pivot. Called when switching to orthographic.
+ */
+function syncOrthographicFrustum(): void {
+  const dist = camera.position.distanceTo(controls.target) || 1;
+  const aspect = perspectiveCamera.aspect || 1;
+  const { halfW, halfH } = orthoHalfExtents(perspectiveCamera.fov, aspect, dist);
+  orthographicCamera.left = -halfW;
+  orthographicCamera.right = halfW;
+  orthographicCamera.top = halfH;
+  orthographicCamera.bottom = -halfH;
+  orthographicCamera.near = perspectiveCamera.near;
+  orthographicCamera.far = perspectiveCamera.far;
+  orthographicCamera.zoom = 1;
+  orthographicCamera.updateProjectionMatrix();
+}
+
+/**
+ * Switch the active viewport camera between perspective and orthographic,
+ * carrying the current view transform and re-pointing controls / gizmo / cube.
+ */
+function setCameraProjection(mode: 'perspective' | 'orthographic'): void {
+  if (mode === cameraProjection) return;
+  const target: THREE.PerspectiveCamera | THREE.OrthographicCamera =
+    mode === 'orthographic' ? orthographicCamera : perspectiveCamera;
+  target.position.copy(camera.position);
+  target.quaternion.copy(camera.quaternion);
+  target.up.copy(camera.up);
+  camera = target;
+  cameraProjection = mode;
+  if (mode === 'orthographic') syncOrthographicFrustum();
+  else perspectiveCamera.updateProjectionMatrix();
+  controls.object = camera;
+  transformControls.camera = camera;
+  viewCube.setMainCamera(camera);
+  controls.update();
+}
+
 function resize() {
   const w = viewport.clientWidth;
   const h = viewport.clientHeight;
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
+  const aspect = w / Math.max(1, h);
+  perspectiveCamera.aspect = aspect;
+  perspectiveCamera.updateProjectionMatrix();
+  // Keep the orthographic frustum aspect-correct (preserve its vertical extent
+  // and any user zoom; only the horizontal extent tracks the viewport aspect).
+  const halfH = Math.abs(orthographicCamera.top) || 1;
+  orthographicCamera.left = -halfH * aspect;
+  orthographicCamera.right = halfH * aspect;
+  orthographicCamera.updateProjectionMatrix();
   renderer.setSize(w, h, false);
   overlay.width = w;
   overlay.height = h;
@@ -3535,7 +3587,11 @@ function makeFeatureHost(): FeatureHost {
       if (ws) setWorkspaceMode(ws);
     },
     scene,
-    camera,
+    get camera() {
+      return camera;
+    },
+    getCameraProjection: () => cameraProjection,
+    setCameraProjection: (mode) => setCameraProjection(mode),
     renderer,
     controls,
     overlay: featureOverlay,

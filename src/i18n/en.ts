@@ -905,6 +905,10 @@ export const en: Record<string, string> = {
   'mesh.remesh': 'Remesh (refine)',
   'status.remeshDone': 'Remeshed: {{before}} → {{after}} triangles',
   'status.remeshNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/view-projection: perspective/ortho toggle ──
+  'view.projection': 'Projection',
+  'status.projectionOrtho': 'Orthographic projection',
+  'status.projectionPersp': 'Perspective projection',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',

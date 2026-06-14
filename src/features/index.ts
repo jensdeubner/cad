@@ -46,6 +46,7 @@ import './nav-named-views';
 import './mesh-hole-fill';
 import './mesh-separate';
 import './mesh-remesh';
+import './view-projection';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
