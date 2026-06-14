@@ -879,6 +879,11 @@ export const de: Record<string, string> = {
   'mesh.weld': 'Verschweißen',
   'status.weldDone': 'Verschweißt: {{before}} → {{after}} Vertices',
   'status.weldNoBody': 'Verschweißen: kein aktiver Körper mit Mesh',
+  // ── feat/visual-style: Darstellungsstil (Wireframe ↔ Schattiert) ──
+  'view.style': 'Darstellung',
+  'view.wireframe': 'Drahtgitter',
+  'status.wireframeOn': 'Drahtgitter-Darstellung aktiv',
+  'status.wireframeOff': 'Schattierte Darstellung aktiv',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'OBJ exportieren',

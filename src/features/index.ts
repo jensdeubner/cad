@@ -20,6 +20,7 @@ import './solid-intersect';
 import './solid-primitives-extra';
 import './mesh-weld';
 import './inspect-com';
+import './render-visual-style';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

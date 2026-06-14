@@ -878,6 +878,11 @@ export const en: Record<string, string> = {
   'mesh.weld': 'Weld',
   'status.weldDone': 'Welded: {{before}} → {{after}} vertices',
   'status.weldNoBody': 'Weld: no active body with mesh',
+  // ── feat/visual-style: Display style (wireframe ↔ shaded) ──
+  'view.style': 'Display Style',
+  'view.wireframe': 'Wireframe',
+  'status.wireframeOn': 'Wireframe display active',
+  'status.wireframeOff': 'Shaded display active',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'Export OBJ',
