@@ -1,0 +1,5 @@
+# Append-only registry/i18n seams: parallel feature branches each append a block
+# at a marker. Union-merge keeps every branch's additions (no conflict markers).
+src/features/index.ts merge=union
+src/i18n/de.ts merge=union
+src/i18n/en.ts merge=union
