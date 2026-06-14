@@ -892,6 +892,11 @@ export const de: Record<string, string> = {
   'status.namedViewSaved': 'Ansicht „{{name}}" gespeichert ({{count}} gesamt)',
   'status.namedViewRestored': 'Ansicht „{{name}}" geladen',
   'status.namedViewNone': 'Keine gespeicherten Ansichten',
+  // ── feat/mesh-hole-fill (#21) ──
+  'mesh.holeFill': 'Löcher füllen',
+  'status.holeFillDone': '{{count}} Loch/Löcher gefüllt (+{{tris}} Dreiecke)',
+  'status.holeFillNone': 'Keine Löcher gefunden — Netz ist geschlossen',
+  'status.holeFillNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',

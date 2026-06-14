@@ -43,6 +43,7 @@ import './construct-plane';
 import './inspect-measure-angle';
 import './inspect-measure-area';
 import './nav-named-views';
+import './mesh-hole-fill';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
