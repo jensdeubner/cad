@@ -182,11 +182,12 @@ export function buildRevolvePayload(
   base: LoftContourPayload,
   axis: PlaneAxis,
   angleDeg: number,
+  segments = 48,
 ): string {
   return JSON.stringify({
     contour: base,
     revolution_axis: revolutionAxisForPlane(axis),
-    segments: 48,
+    segments,
     angle_deg: angleDeg,
   });
 }

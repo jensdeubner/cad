@@ -53,6 +53,8 @@ export interface SketchDimensionHost {
   pickSketchHit(clientX: number, clientY: number): THREE.Vector3 | null;
   pushUndo(label?: string): void;
   rebuildContourLines(): void;
+  /** After a dimension value edit mutates a contour's geometry (#30 recompute trigger). */
+  onContourGeometryEdited?(contourId: string): void;
   setDimPickCursor(canPick: boolean): void;
   openSketchPanel(): void;
   /** After placing/editing a dimension or cancelling placement — e.g. switch to navigate. */
@@ -639,6 +641,7 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
       edge.a.copy(contour.points[edge.pointIndex0]);
       edge.b.copy(contour.points[edge.pointIndex1]);
       host.rebuildContourLines();
+      host.onContourGeometryEdited?.(edge.contourId);
 
       if (dimSession.editingId) {
         const dims = host.getSketchDimensions();

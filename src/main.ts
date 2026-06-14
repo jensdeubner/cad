@@ -197,7 +197,9 @@ import {
   type FeatureRecipe,
   recipeIdForBody,
   recipeForBody,
+  recipesForContour,
   withRecipe,
+  withoutBodyRecipe,
   cloneFeatureRecipe,
 } from './feature-recipe';
 import {
@@ -467,6 +469,7 @@ function recordSolidFeature(kind: FeatureKind, label: string, bodyId?: string) {
  */
 async function recomputeBodyFromRecipe(
   bodyId: string,
+  opts?: { pushUndo?: boolean },
 ): Promise<RecomputeStatus | 'no-recipe'> {
   const recipe = recipeForBody(featureRecipes, bodyId);
   if (!recipe) return 'no-recipe';
@@ -491,10 +494,27 @@ async function recomputeBodyFromRecipe(
   };
   const res = recomputeFeature(recipe, deps);
   if (res.status === 'ok' && res.geometry) {
-    pushMeshUndo('Feature neu berechnen');
+    if (opts?.pushUndo !== false) pushMeshUndo('Feature neu berechnen');
     await replaceBodyGeometryFull(bodyId, res.geometry);
   }
   return res.status;
+}
+
+/**
+ * #30 Phase 2: auto-recompute every recipe-body that depends on any of the given
+ * contours, against the CURRENT sketch state. No own undo step — the triggering
+ * sketch edit owns the undo, and undo/redo re-derives recipe bodies in
+ * restoreSnapshot, so the body always matches its (restored) contour.
+ */
+async function recomputeDependentsForContours(contourIds: readonly string[]): Promise<void> {
+  if (!featureRecipes.length || !contourIds.length) return;
+  const bodyIds = new Set<string>();
+  for (const cid of contourIds) {
+    for (const r of recipesForContour(featureRecipes, cid)) bodyIds.add(r.bodyId);
+  }
+  for (const bodyId of bodyIds) {
+    await recomputeBodyFromRecipe(bodyId, { pushUndo: false });
+  }
 }
 
 /**
@@ -1069,6 +1089,7 @@ function deleteBodyById(bodyId: string) {
   });
   bodySolidColors.delete(bodyId);
   bodyTraceAssist.delete(bodyId);
+  featureRecipes = withoutBodyRecipe(featureRecipes, bodyId);
   cadScene.removeBody(bodyId);
   updateTransformGizmo();
   refreshBrowserPanel();
@@ -2229,6 +2250,9 @@ sketchDims = createSketchDimensionApi({
   pickSketchHit,
   pushUndo: (label?: string) => pushUndo(label),
   rebuildContourLines,
+  onContourGeometryEdited: (contourId: string) => {
+    void recomputeDependentsForContours([contourId]);
+  },
   setDimPickCursor: (canPick) => {
     viewport.classList.toggle('sketch-dim-can-pick', canPick && tool === 'sketch-dim');
   },
@@ -2634,6 +2658,11 @@ function solveActiveSketchConstraints(): SketchSolveResult {
     sketchDims.rebuild();
   }
   rebuildConstraintGlyphs();
+  // #30 Phase 2: a sketch edit (drag / delete / constraint) may have changed
+  // contour geometry — recompute dependent recipe bodies for the active sketch.
+  void recomputeDependentsForContours(
+    contours.filter((c) => c.sketchId === activeSketchId).map((c) => c.id),
+  );
   return res;
 }
 
@@ -3098,6 +3127,13 @@ function restoreSnapshot(snap: ReturnType<typeof snapshotNow>) {
   onBodyTransformChanged();
   updateTransformGizmo();
   applyTimelineMarker(); // keep suppression consistent after a snapshot restore
+  // #30 Phase 2: re-derive recipe bodies whose mesh was NOT explicitly restored
+  // (parametric undo/redo of a sketch edit) so they match the restored contours.
+  // Bodies whose mesh WAS restored (direct mesh-edit undo) are left intact.
+  const restoredMeshIds = snap.bodyMeshBuffers ?? {};
+  for (const r of featureRecipes) {
+    if (!restoredMeshIds[r.bodyId]) void recomputeBodyFromRecipe(r.bodyId, { pushUndo: false });
+  }
 }
 
 function performUndo() {
@@ -6567,6 +6603,17 @@ async function boot() {
       const r = recipeForBody(featureRecipes, bodyId);
       if (!r || r.kind !== 'extrude') return false;
       featureRecipes = withRecipe(featureRecipes, { ...r, distanceMm: mm });
+      return true;
+    },
+    editContourPointUV: (contourId: string, index: number, uv: [number, number]) => {
+      const c = contours.find((x) => x.id === contourId);
+      if (!c || index < 0 || index >= c.points.length) return false;
+      const pts = contourPointsFromUV([uv], c.axis, c.position);
+      if (!pts.length) return false;
+      c.points[index].copy(pts[0]);
+      rebuildContourLines();
+      // fires the auto-recompute trigger (unconditional) for dependent recipe bodies
+      solveActiveSketchConstraints();
       return true;
     },
     timelineMarker: () => getTimelineMarker(),

@@ -85,7 +85,9 @@ export function recomputeFeature(recipe: FeatureRecipe, deps: RecomputeDeps): Re
     }
     case 'revolve': {
       const base = contourLoftPayload(resolved[0], deps.worldMatrix(resolved[0]));
-      mesh = deps.revolveJson(buildRevolvePayload(base, recipe.axis, recipe.angleDeg));
+      mesh = deps.revolveJson(
+        buildRevolvePayload(base, recipe.axis, recipe.angleDeg, recipe.segments),
+      );
       break;
     }
     case 'loft': {
