@@ -882,4 +882,9 @@ export const de: Record<string, string> = {
   'solid.cylinder': 'Zylinder',
   'solid.sphere': 'Kugel',
   'status.primitiveCreated': '{{label}} erstellt',
+  // ── Feature: 3D-Modell-Statistik ──
+  'inspect.analyze': 'Analyse',
+  'inspect.stats': 'Statistik',
+  'inspect.stats.noBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  'status.statsDone': 'Vol {{vol}} mm³ · Fläche {{area}} mm²',
 };

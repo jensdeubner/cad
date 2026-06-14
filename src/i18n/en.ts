@@ -881,4 +881,9 @@ export const en: Record<string, string> = {
   'solid.cylinder': 'Cylinder',
   'solid.sphere': 'Sphere',
   'status.primitiveCreated': '{{label}} created',
+  // ── Feature: 3D model statistics ──
+  'inspect.analyze': 'Analyze',
+  'inspect.stats': 'Statistics',
+  'inspect.stats.noBody': 'No active body — load geometry or create a primitive first',
+  'status.statsDone': 'Vol {{vol}} mm³ · Area {{area}} mm²',
 };
