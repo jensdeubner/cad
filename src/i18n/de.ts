@@ -879,6 +879,10 @@ export const de: Record<string, string> = {
   'solid.patternGridBody': 'Muster',
   'status.patternGridDone': 'Rechteckmuster erstellt: {{count}} Kopien',
   'status.patternGridNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
+  // ── feat/mesh-subdivide: Mesh unterteilen ──
+  'mesh.subdivide': 'Unterteilen',
+  'status.subdivideDone': 'Unterteilt: {{before}} → {{after}} Dreiecke',
+  'status.subdivideNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── feat/bbox-body: Begrenzungsrahmen-Körper ──
   'solid.bboxBody': 'Begrenzungsrahmen',
   'status.bboxBodyDone': 'Begrenzungsrahmen-Körper erstellt',

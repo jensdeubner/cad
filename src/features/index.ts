@@ -32,6 +32,7 @@ import './solid-scale-factor';
 import './io-obj-import';
 import './render-edge-display';
 import './solid-pattern-rect';
+import './mesh-subdivide';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
