@@ -41,6 +41,7 @@ import './solid-sphere-body';
 import './io-ply-export';
 import './construct-plane';
 import './inspect-measure-angle';
+import './inspect-measure-area';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

@@ -878,6 +878,11 @@ export const de: Record<string, string> = {
   'inspect.measureAngle': 'Winkel messen',
   'status.measureAngleDone': 'Winkel: {{deg}}°',
   'status.measureAngleNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── [#1 measure] Fläche messen (Gesamtoberfläche + koplanare Region) ──
+  'inspect.measureArea': 'Fläche messen',
+  'status.measureAreaDone': 'Gesamtoberfläche: {{area}} mm²',
+  'status.measureAreaFace': 'Flächenregion: {{area}} mm²',
+  'status.measureAreaNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',
