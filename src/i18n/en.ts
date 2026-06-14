@@ -970,4 +970,9 @@ export const en: Record<string, string> = {
   'view.isolate': 'Isolate',
   'status.isolateOn': 'Isolated — only the active body is visible',
   'status.isolateOff': 'Isolation cleared — all bodies visible',
+  // ── feat/duplicate-body: Duplicate body ──
+  'solid.duplicate': 'Duplicate',
+  'solid.duplicateBody': 'Copy',
+  'status.duplicateDone': 'Body duplicated — copy inserted with offset',
+  'status.duplicateNoBody': 'No active body — load geometry or create a primitive first',
 };

@@ -25,6 +25,7 @@ import './solid-pattern-circular';
 import './solid-mirror-plane';
 import './view-visibility';
 import './view-isolate';
+import './solid-duplicate';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

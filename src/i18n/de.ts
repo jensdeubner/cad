@@ -971,4 +971,9 @@ export const de: Record<string, string> = {
   'view.isolate': 'Isolieren',
   'status.isolateOn': 'Isoliert — nur aktiver Körper sichtbar',
   'status.isolateOff': 'Isolierung aufgehoben — alle Körper sichtbar',
+  // ── feat/duplicate-body: Körper duplizieren ──
+  'solid.duplicate': 'Duplizieren',
+  'solid.duplicateBody': 'Kopie',
+  'status.duplicateDone': 'Körper dupliziert — Kopie versetzt eingefügt',
+  'status.duplicateNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
 };
