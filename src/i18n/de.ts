@@ -874,6 +874,10 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/edge-display: Kanten anzeigen (Shaded with Edges) ──
+  'view.edges': 'Kanten',
+  'status.edgesOn': 'Kanten eingeblendet',
+  'status.edgesOff': 'Kanten ausgeblendet',
   // ── feat/weld: Make Closed / Verschweißen ──
   'mesh.repair': 'Reparatur',
   'mesh.weld': 'Verschweißen',

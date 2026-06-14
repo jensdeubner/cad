@@ -873,6 +873,10 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/edge-display: Show Edges (Shaded with Edges) ──
+  'view.edges': 'Edges',
+  'status.edgesOn': 'Edges shown',
+  'status.edgesOff': 'Edges hidden',
   // ── feat/weld: Make Closed / Weld ──
   'mesh.repair': 'Repair',
   'mesh.weld': 'Weld',
