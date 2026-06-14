@@ -461,6 +461,19 @@ function applySketchDimKindOptions() {
   });
 }
 
+function applySketchConstraintKindOptions() {
+  const select = document.getElementById('sketch-constraint-kind');
+  if (!select) return;
+  select.querySelectorAll('option').forEach((opt) => {
+    const value = (opt as HTMLOptionElement).value;
+    const label = t(`sketchConstraint.kind.${value}`);
+    // value === '' means the key was missing; keep the static fallback then.
+    if (label && label !== `sketchConstraint.kind.${value}`) {
+      opt.textContent = value === 'distance' ? `${label} (mm)` : label;
+    }
+  });
+}
+
 function applySketchUnitOptions() {
   const select = document.getElementById('sketch-unit');
   if (!select) return;
@@ -517,6 +530,7 @@ export function applyDomTranslations(opts?: { transformLocal?: boolean }) {
   applyScanModeOptions();
   applySliceAxisOptions();
   applySketchDimKindOptions();
+  applySketchConstraintKindOptions();
   applySketchUnitOptions();
   applyPlaneAxisOptions();
   if (opts?.transformLocal !== undefined) {

@@ -55,6 +55,14 @@ test('solid-pattern-circular: creates rotated copies as new bodies', async ({ pa
   expect(after).toBeGreaterThan(before);
 
   // Hard geometry assertion: the active (last-created) body has real triangles.
+  // Poll to avoid a transient 0 while the freshly promoted mesh finishes committing
+  // (the body count can grow a tick before the active body's geometry is bound).
+  await page.waitForFunction(
+    () =>
+      (window as unknown as { __cadDebug: { triangleCount: (id?: string) => number } }).__cadDebug.triangleCount() > 0,
+    undefined,
+    { timeout: 10_000 },
+  );
   expect(await cadDebug<number>(page, 'triangleCount')).toBeGreaterThan(0);
 
   expectNoConsoleErrors(guard);

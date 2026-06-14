@@ -86,6 +86,11 @@ test('#11 sketch constraints: horizontal via the ribbon button + point picking (
   await page.locator('[data-tool="sketch-constraint"]').click();
   expect(await cadDebug<string>(page, 'activeTool')).toBe('sketch-constraint');
 
+  // Constraint-kind dropdown is localized in EN (not the static German fallback).
+  expect(
+    await page.locator('#sketch-constraint-kind option[value="coincident"]').textContent(),
+  ).toBe('Coincident');
+
   // Pick the constraint kind (the panel select drives `sketchConstraintKind`).
   await page.evaluate(() => {
     const sel = document.getElementById('sketch-constraint-kind') as HTMLSelectElement;
@@ -185,6 +190,27 @@ test('#11 sketch constraints: deleting a contour drops its constraints and glyph
   await cadDebug(page, 'deleteContourById', b);
   expect(await cadDebug<number>(page, 'sketchConstraintCount')).toBe(1);
   expect(await cadDebug<number>(page, 'constraintGlyphCount')).toBe(1);
+
+  expectNoConsoleErrors(guard);
+});
+
+test('#11 sketch constraints: a dimension follows the solver when a constrained point moves', async ({ page }) => {
+  const guard = await bootApp(page);
+  expect(await cadDebug<string | null>(page, 'beginSketchOnAxis', 'xy')).toBeTruthy();
+  const c = (await cadDebug<string | null>(page, 'addSketchContourUV', [[0, 0], [10, 0]], false))!;
+  // Place a linear dimension on the edge, then constrain that edge to length 4.
+  await cadDebug(page, 'addLinearDimensionTest', c, 0, 1);
+  const r = (i: number): Ref => ({ contourId: c, pointIndex: i });
+  await cadDebug(page, 'addSketchConstraint', 'fix', [r(0)]);
+  await cadDebug(page, 'addSketchConstraint', 'distance', [r(0), r(1)], 4);
+
+  // The point moved to satisfy the distance; the dimension must follow it.
+  const p1 = (await cadDebug<Vec3>(page, 'contourPointAt', c, 1))!;
+  expect(d2(p1, [0, 0, 0])).toBeCloseTo(4, 1);
+  const dim = (await cadDebug<{ a: Vec3; b: Vec3 }>(page, 'dimensionEndpoints', 0))!;
+  expect(dim.a[0]).toBeCloseTo(0, 2);
+  expect(dim.b[0]).toBeCloseTo(p1[0], 3);
+  expect(dim.b[1]).toBeCloseTo(p1[1], 3);
 
   expectNoConsoleErrors(guard);
 });

@@ -2457,6 +2457,7 @@ function solveActiveSketchConstraints(): SketchSolveResult {
   const res = solveSketchConstraints(contours, active);
   if (res.changed) {
     rebuildContourLines();
+    sketchDims.syncToContours();
     sketchDims.rebuild();
   }
   rebuildConstraintGlyphs();
@@ -6303,6 +6304,33 @@ async function boot() {
       return activeSketchId;
     },
     deleteContourById: (id: string) => deleteBrowserItem(`contour:${id}`),
+    addLinearDimensionTest: (contourId: string, i0: number, i1: number) => {
+      if (!activeSketchId) return null;
+      const c = contours.find((x) => x.id === contourId);
+      if (!c || i0 < 0 || i1 < 0 || i0 >= c.points.length || i1 >= c.points.length) return null;
+      const dim: SketchDimension = {
+        id: uid(),
+        sketchId: activeSketchId,
+        kind: 'linear',
+        axis: planeAxis,
+        position: planePosition,
+        a: c.points[i0].clone(),
+        b: c.points[i1].clone(),
+        offset: 5,
+        visible: true,
+        contourId,
+        pointIndex0: i0,
+        pointIndex1: i1,
+      };
+      sketchDimensions = [...sketchDimensions, dim];
+      sketchDims.rebuild();
+      return dim.id;
+    },
+    dimensionEndpoints: (index: number) => {
+      const d = sketchDimensions[index];
+      if (!d) return null;
+      return { a: [d.a.x, d.a.y, d.a.z], b: [d.b.x, d.b.y, d.b.z] };
+    },
     solveActiveSketch: () => solveActiveSketchConstraints(),
   };
 }

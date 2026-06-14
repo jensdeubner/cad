@@ -24,6 +24,7 @@ import {
   pickSketchEdge,
   sketchEdgesEqual,
   sketchLengthMm,
+  syncDimensionsToContours,
   updateSketchDimensionLabelScales,
   type SketchDimension,
   type SketchDimensionKind,
@@ -90,6 +91,8 @@ export interface SketchDimensionApi {
   applyPendingValue(): void;
   rebuild(preview?: SketchDimension | null): void;
   refreshList(): void;
+  /** Re-anchor dimensions to current contour geometry (after a solver move). */
+  syncToContours(): void;
   dimensionsToProject(): ReturnType<typeof serializeDimensions>;
   onUnitChanged(): void;
   updateScreenScales(): void;
@@ -678,6 +681,10 @@ export function createSketchDimensionApi(host: SketchDimensionHost): SketchDimen
 
     rebuild,
     refreshList,
+
+    syncToContours() {
+      host.setSketchDimensions(syncDimensionsToContours(host.getSketchDimensions(), host.getContours()));
+    },
 
     dimensionsToProject() {
       return serializeDimensions(host.getSketchDimensions());

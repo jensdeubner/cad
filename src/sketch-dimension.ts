@@ -378,6 +378,42 @@ export function cloneSketchDimension(d: SketchDimension): SketchDimension {
   };
 }
 
+/**
+ * Re-anchor dimensions to their contour geometry after points moved (e.g. the
+ * constraint solver shifted them). Linear dims follow their endpoint indices;
+ * radius/diameter dims recompute centre + nearest rim. Dims without a resolvable
+ * contour are returned unchanged. Returns a new array (cloned where updated).
+ */
+export function syncDimensionsToContours(
+  dims: SketchDimension[],
+  contours: Contour[],
+): SketchDimension[] {
+  const byId = new Map(contours.map((c) => [c.id, c]));
+  return dims.map((d) => {
+    if (!d.contourId) return d;
+    const c = byId.get(d.contourId);
+    if (!c) return d;
+    if (d.kind === 'linear') {
+      const i0 = d.pointIndex0 ?? 0;
+      const i1 = d.pointIndex1 ?? 1;
+      if (i0 < 0 || i1 < 0 || i0 >= c.points.length || i1 >= c.points.length) return d;
+      return { ...d, a: c.points[i0].clone(), b: c.points[i1].clone() };
+    }
+    const circle = circleCenter2D(c);
+    if (!circle) return d;
+    let nearest = c.points[0];
+    let nearestD = circle.center.distanceTo(c.points[0]);
+    for (const p of c.points) {
+      const pd = circle.center.distanceTo(p);
+      if (pd < nearestD) {
+        nearestD = pd;
+        nearest = p;
+      }
+    }
+    return { ...d, a: circle.center.clone(), b: nearest.clone() };
+  });
+}
+
 export function sketchEdgeKey(
   edge: Pick<SketchEdgePick, 'contourId' | 'pointIndex0' | 'pointIndex1'>,
 ): string {
