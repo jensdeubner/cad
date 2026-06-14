@@ -1017,4 +1017,9 @@ export const en: Record<string, string> = {
   'solid.dropFloor': 'Drop to Floor',
   'status.dropFloorDone': 'Body dropped to floor (min Z = 0)',
   'status.dropFloorNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/plane-cut: Plane Cut (keep +Z half) ──
+  'solid.planeCut': 'Plane Cut',
+  'status.planeCutDone': 'Plane cut — lower half removed',
+  'status.planeCutEmpty': 'Plane cut empty — plane lies above the body',
+  'status.planeCutNoBody': 'No active body — load geometry or create a primitive first',
 };

@@ -1018,4 +1018,9 @@ export const de: Record<string, string> = {
   'solid.dropFloor': 'Auf Boden setzen',
   'status.dropFloorDone': 'Körper auf Boden gesetzt (min Z = 0)',
   'status.dropFloorNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/plane-cut: Ebenenschnitt (keep +Z half) ──
+  'solid.planeCut': 'Ebenenschnitt',
+  'status.planeCutDone': 'Ebenenschnitt — untere Hälfte entfernt',
+  'status.planeCutEmpty': 'Ebenenschnitt leer — Ebene liegt über dem Körper',
+  'status.planeCutNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
 };
