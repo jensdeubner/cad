@@ -15,6 +15,8 @@ nach jedem die Gates grün. Abschluss: adversariale Review des Diffs.
 | **INC1c** | **Persistenz** (.stpr v7→v8) + Undo-Threading | `project-file.ts`, `undo.ts`, `main.ts` |
 | **INC2a** | Pure **Recompute-Engine** (Rezept + Live-Sketch → Geometrie) | `src/feature-recompute.ts` |
 | **INC2b** | On-Demand-Recompute-Pfad + realer WASM-E2E-Beweis | `main.ts` + E2E |
+| **INC3a** | **Auto-Recompute** bei Sketch-Edit (Abhängigkeits-Trigger) + Undo-Re-Derive + Politur (Prune/`segments`) | `main.ts`, `dimensions.ts`, `solid-revolve.ts`, `feature-recompute.ts` |
+| **INC3b** | **Timeline-Chip-Parameter-Edit** (✎ → Prompt → Recompute) | `feature-timeline.ts`, `main.ts`, i18n |
 
 ## Architektur
 
@@ -39,9 +41,23 @@ die vorhandenen `build{Extrude,Revolve,LoftContours}Payload`-Encoder die WASM-An
 `ok | missing-contour | op-failed | empty` + `BufferGeometry` zurück. WASM-Ops **werfen** im Fehlerfall
 (und loft/revolve können leer ohne Wurf zurückkehren) → beides wird abgefangen.
 
-**On-Demand-Pfad** (`main.ts`): `recomputeBodyFromRecipe(bodyId)` verdrahtet die Engine mit Live-
-Konturen + echten WASM-Ops und ersetzt die Body-Geometrie via `replaceBodyGeometryFull`. Test-Bridge:
-`__cadDebug.recomputeBody` (+ test-only `testExtrudeContour`/`setExtrudeRecipeDistance`).
+**On-Demand-Pfad** (`main.ts`): `recomputeBodyFromRecipe(bodyId, {pushUndo?})` verdrahtet die Engine
+mit Live-Konturen + echten WASM-Ops und ersetzt die Body-Geometrie via `replaceBodyGeometryFull`.
+Test-Bridge: `__cadDebug.recomputeBody` (+ test-only `testExtrudeContour`/`setExtrudeRecipeDistance`).
+
+**Auto-Recompute (INC3a):** Ein Sketch-Edit berechnet abhängige Recipe-Bodies automatisch neu.
+`solveActiveSketchConstraints` (deckt Punkt-Drag/Löschen/Constraint ab) ruft unbedingt
+`recomputeDependentsForContours(aktive-Sketch-Konturen)`; Bemaßungswert-Edits feuern über einen neuen
+`onContourGeometryEdited`-Host-Hook in `applyPendingValue`. Beide nutzen `recipesForContour` →
+`recomputeBodyFromRecipe(…, {pushUndo:false})`. **Undo/Redo-Konsistenz:** `restoreSnapshot` re-derived
+Recipe-Bodies, deren Mesh *nicht* explizit wiederhergestellt wurde (parametrischer Sketch-Undo) —
+Bodies mit wiederhergestelltem Mesh (direkte Mesh-Edits) bleiben unangetastet. So matcht jeder Body
+nach Undo/Redo seine wiederhergestellte Kontur, ohne direkte Mesh-Edits zu überschreiben.
+
+**Timeline-Edit (INC3b):** Jeder extrude/revolve-Chip trägt einen ✎-Button (separat vom
+Chip-Klick=Rollback, `stopPropagation`). Klick → `parsePromptFloat` für Distanz/Winkel →
+`applyRecipeParamEdit` (Recipe-Update via `withRecipe` + Recompute als **ein** Mesh-Undo-Schritt).
+loft hat keinen Einzel-Skalar → kein ✎ (loft folgt dem Sketch-Auto-Trigger).
 
 **Persistenz + Undo:** `featureRecipes` durchgefädelt analog `sketchConstraints` — `.stpr`
 `PROJECT_VERSION` 7→**8** (`migrateV8` + `ensureFeatureRecipes`-Defaulter; alle Altversionen
@@ -56,25 +72,26 @@ sowie `AppSnapshot`/`captureSnapshot`/`snapshotNow`/`pushMeshUndo`/`restoreSnaps
 
 ## Verifikation
 
-`npm run typecheck` 0 · `npm run test` **1230** vitest (inkl. `feature-recipe`, `feature-recompute`,
-`feature-recipe-persist`) · `npm run build` ok · `recompute.spec.ts` grün am echten Kernel
-(extrude 10 mm → Rezept erfasst → Distanz 30 mm → recompute → Z-Ausdehnung 10→30). Voll-E2E:
-88/89 pro Lauf; der je **wechselnde** eine Fehlschlag (edge-display / timeline / views — von Phase 2
-unberührte Features) ist last-induzierte Flakiness und besteht **isoliert 10/10 grün**.
+`npm run typecheck` 0 · `npm run test` **1236** vitest (inkl. `feature-recipe`, `feature-recompute`,
+`feature-recipe-persist`) · `npm run build` ok · Voll-E2E **91/91 grün** (sauberer Lauf, 0 Fehlschläge).
+Drei reale-WASM-E2E beweisen den parametrischen Kern: `recompute.spec` (extrude 10 mm → Distanz 30 mm →
+recompute → Z-Ausdehnung 10→30), `recompute-auto.spec` (Quell-Konturpunkt verschoben → abhängiger Body
+wird automatisch breiter), `timeline-edit.spec` (✎-Button → Prompt → Recompute, Bridge- + UI-Pfad).
+(Hinweis: unter starker paralleler CPU-Last flaken vereinzelt von Phase 2 **unberührte** Specs —
+edge-display/timeline/views —, die isoliert grün sind; im lastfreien Lauf ist die Suite vollständig grün.)
 
-## Bekannte Grenzen / Nächster Schritt
+## Bekannte Grenzen
 
-- **Recompute ist On-Demand**, noch kein Auto-Trigger. **INC3** (Folge-Inkrement):
-  `solveActiveSketchConstraints` + Bemaßungs-Edit (`applyPendingValue`) hängen sich über
-  `recipesForContour` an `recomputeBodyFromRecipe` der abhängigen Bodies → *live*-parametrisch;
-  plus Timeline-Chip-Edit-UI (Parameter editieren → Downstream-Recompute).
-- Rezept-Quell-id-Stabilität bei strukturellen Kontur-Edits (Punkt-Insert/Delete, Kontur-Löschung):
-  das Rezept referenziert die Kontur-id (stabil); bei gelöschter Quell-Kontur liefert Recompute
-  sauber `missing-contour`.
-- `RevolveRecipe.segments` ist heute konstant 48 (Vorhalt für künftige Konfigurierbarkeit;
-  `buildRevolvePayload` setzt 48 fest, der Wert wird beim Recompute noch nicht gelesen).
-- Body-Löschen entfernt das zugehörige Rezept (noch) nicht — verwaiste Rezepte sind harmlos
-  (`recipeForBody` matcht per `bodyId`); sauberes Prunen ist Folgearbeit.
+- **Recomputebar bleibt extrude/revolve/loft.** subtract/join/mirror/pattern (mutierend/
+  duplizierend) und intersect/sweep (kein WASM-Kernel) sind nicht parametrisch — bewusst out-of-scope.
+- Rezept-Quell-id-Stabilität bei strukturellen Kontur-Edits: das Rezept referenziert die Kontur-id
+  (stabil); bei gelöschter Quell-Kontur liefert Recompute sauber `missing-contour`. Body-Löschen
+  entfernt das Rezept (`withoutBodyRecipe`).
+- Recompute überschreibt direkte Mesh-Edits eines Recipe-Bodies (parametrisch gewinnt); bei einem
+  Mesh-Edit-**Undo** bleibt das wiederhergestellte Mesh aber erhalten (kein Re-Derive).
+- Loft-Profil-Reihenfolge/-Anzahl ist über die Quell-Konturen fixiert; ein UI zum Umordnen/Ergänzen
+  von Loft-Profilen ist Folgearbeit. `RevolveRecipe.segments` wird beim Recompute honoriert (heute
+  konstant 48, da keine UI es ändert).
 
 > Hinweis (in der Review bestätigt): Recompute durchläuft denselben Finalisierungs-Pfad wie die
 > Erzeugung — `replaceBodyGeometryFull` → STL-Roundtrip → `buildScanMesh`/`centerGeometry`. Die
