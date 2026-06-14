@@ -22,6 +22,7 @@ import './mesh-weld';
 import './inspect-com';
 import './render-visual-style';
 import './solid-pattern-circular';
+import './solid-mirror-plane';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

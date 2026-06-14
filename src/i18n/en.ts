@@ -888,6 +888,11 @@ export const en: Record<string, string> = {
   'solid.patternCircularBody': 'Pattern',
   'status.patternCircularDone': 'Circular pattern created: {{count}} copies',
   'status.patternCircularNoBody': 'No active body — load or create geometry first',
+  // ── feat/mirror-plane ──
+  'solid.mirrorPlane': 'Mirror (Plane)',
+  'solid.mirrorPlaneBody': 'Mirror',
+  'status.mirrorPlaneDone': 'Mirrored body created (XZ plane)',
+  'status.mirrorPlaneNoBody': 'No active body — load or create geometry first',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'Export OBJ',

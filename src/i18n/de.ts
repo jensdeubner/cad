@@ -889,6 +889,11 @@ export const de: Record<string, string> = {
   'solid.patternCircularBody': 'Muster',
   'status.patternCircularDone': 'Kreismuster erstellt: {{count}} Kopien',
   'status.patternCircularNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
+  // ── feat/mirror-plane ──
+  'solid.mirrorPlane': 'Spiegeln (Ebene)',
+  'solid.mirrorPlaneBody': 'Spiegelung',
+  'status.mirrorPlaneDone': 'Gespiegelter Körper erstellt (XZ-Ebene)',
+  'status.mirrorPlaneNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
   // ── feat/obj-export ──
   'io.export': 'Export',
   'io.objExport': 'OBJ exportieren',
