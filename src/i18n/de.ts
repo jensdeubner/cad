@@ -874,6 +874,10 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── #1 measure: 3D-Winkelmessung (3-Punkt) ──
+  'inspect.measureAngle': 'Winkel messen',
+  'status.measureAngleDone': 'Winkel: {{deg}}°',
+  'status.measureAngleNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',

@@ -873,6 +873,10 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── #1 measure: 3D angle measurement (3-point) ──
+  'inspect.measureAngle': 'Measure angle',
+  'status.measureAngleDone': 'Angle: {{deg}}°',
+  'status.measureAngleNoBody': 'No active body — load geometry or create a primitive first',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',
