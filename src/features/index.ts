@@ -35,6 +35,7 @@ import './solid-pattern-rect';
 import './mesh-subdivide';
 import './mesh-smooth';
 import './solid-drop-floor';
+import './solid-scale-to-size';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
