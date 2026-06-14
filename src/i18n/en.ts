@@ -873,6 +873,12 @@ export const en: Record<string, string> = {
   'status.dimUpdated': 'Dimension updated: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── #16: offset construction plane ──
+  'construct.planes': 'Construction Planes',
+  'construct.planeXY': 'Offset Plane XY',
+  'construct.planeXZ': 'Offset Plane XZ',
+  'construct.planeYZ': 'Offset Plane YZ',
+  'status.offsetPlaneDone': 'Offset plane {{axis}} @ {{d}} mm — sketch ready',
   // ── feat/pattern-rect: Rectangular Pattern ──
   'solid.patternGrid': 'Rectangular Pattern',
   'solid.patternGridBody': 'Pattern',

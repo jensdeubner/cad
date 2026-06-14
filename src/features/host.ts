@@ -14,7 +14,7 @@ import type { CadScene, CadBodyRecord, CadBodyId } from '../cad-scene';
 import type { SurfacePick } from '../body-edit';
 import type { BodyKind } from '../body-kind';
 import type { FusionTab } from '../app-menu';
-import type { Contour } from '../types';
+import type { Contour, PlaneAxis } from '../types';
 import type { Sketch } from '../sketch';
 
 export interface FeatureHost {
@@ -52,6 +52,12 @@ export interface FeatureHost {
   getContours(): Contour[];
   getSketches(): Sketch[];
   getActiveSketchId(): string | null;
+  /**
+   * Start a new sketch on an origin plane, optionally offset along the plane
+   * normal (a construction plane). Returns the new sketch id. Switches to the
+   * sketch workspace.
+   */
+  startSketch(axis: PlaneAxis, position?: number): string;
 
   // ── create / mutate geometry ────────────────────────────────────
   /**

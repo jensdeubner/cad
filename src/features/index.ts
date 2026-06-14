@@ -39,6 +39,7 @@ import './solid-scale-to-size';
 import './solid-plane-cut';
 import './solid-sphere-body';
 import './io-ply-export';
+import './construct-plane';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

@@ -3367,6 +3367,10 @@ function makeFeatureHost(): FeatureHost {
     getContours: () => contours,
     getSketches: () => sketches,
     getActiveSketchId: () => activeSketchId,
+    startSketch: (axis, position = 0) => {
+      beginSketchOnPlane(axis, position);
+      return activeSketchId ?? '';
+    },
     addBodyFromGeometry,
     replaceBodyGeometry: replaceBodyGeometryFull,
     refreshBrowser: refreshBrowserPanel,

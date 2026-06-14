@@ -874,6 +874,12 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── #16: Offset-Konstruktionsebene ──
+  'construct.planes': 'Konstruktionsebenen',
+  'construct.planeXY': 'Offset-Ebene XY',
+  'construct.planeXZ': 'Offset-Ebene XZ',
+  'construct.planeYZ': 'Offset-Ebene YZ',
+  'status.offsetPlaneDone': 'Offset-Ebene {{axis}} @ {{d}} mm — Skizze bereit',
   // ── feat/pattern-rect: Rechteckmuster ──
   'solid.patternGrid': 'Rechteckmuster',
   'solid.patternGridBody': 'Muster',
