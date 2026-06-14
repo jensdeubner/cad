@@ -882,6 +882,15 @@ export const en: Record<string, string> = {
   'status.measureAreaDone': 'Total surface area: {{area}} mm²',
   'status.measureAreaFace': 'Face region: {{area}} mm²',
   'status.measureAreaNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/named-views: multi-slot custom named views ──
+  'view.namedSave': 'Remember view',
+  'view.namedRestore': 'Last view',
+  'view.namedSlot': 'View {{n}}',
+  'view.namedDelete': 'Delete',
+  'panel.namedViews.title': 'Custom views',
+  'status.namedViewSaved': 'View "{{name}}" saved ({{count}} total)',
+  'status.namedViewRestored': 'View "{{name}}" restored',
+  'status.namedViewNone': 'No saved views',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',

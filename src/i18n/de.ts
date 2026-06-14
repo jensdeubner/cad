@@ -883,6 +883,15 @@ export const de: Record<string, string> = {
   'status.measureAreaDone': 'Gesamtoberfläche: {{area}} mm²',
   'status.measureAreaFace': 'Flächenregion: {{area}} mm²',
   'status.measureAreaNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/named-views: Eigene benannte Ansichten (mehrere Slots) ──
+  'view.namedSave': 'Ansicht merken',
+  'view.namedRestore': 'Letzte Ansicht',
+  'view.namedSlot': 'Ansicht {{n}}',
+  'view.namedDelete': 'Löschen',
+  'panel.namedViews.title': 'Eigene Ansichten',
+  'status.namedViewSaved': 'Ansicht „{{name}}" gespeichert ({{count}} gesamt)',
+  'status.namedViewRestored': 'Ansicht „{{name}}" geladen',
+  'status.namedViewNone': 'Keine gespeicherten Ansichten',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',

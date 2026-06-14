@@ -42,6 +42,7 @@ import './io-ply-export';
 import './construct-plane';
 import './inspect-measure-angle';
 import './inspect-measure-area';
+import './nav-named-views';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
