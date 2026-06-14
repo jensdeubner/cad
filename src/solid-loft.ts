@@ -16,7 +16,11 @@ export type LoftHost = ProfilePickHost & {
   loftContours: (payloads: LoftContourPayload[]) => ParsedLoftMesh | null;
   showLoftPreview: (mesh: ParsedLoftMesh) => void;
   clearLoftPreview: () => void;
-  commitLoft: (mesh: ParsedLoftMesh, profileCount: number) => Promise<void>;
+  commitLoft: (
+    mesh: ParsedLoftMesh,
+    profileCount: number,
+    sourceContourIds: string[],
+  ) => Promise<void>;
   highlightContour: (id: string | null) => void;
   syncOrbitControls: () => void;
 };
@@ -179,8 +183,9 @@ async function commitSpacing(host: LoftHost) {
     host.syncOrbitControls();
     return;
   }
+  const ids = [...selectedIds];
   resetState(host);
-  await host.commitLoft(mesh, 2);
+  await host.commitLoft(mesh, 2, ids);
 }
 
 export async function tryCommitLoft(host: LoftHost): Promise<boolean> {
@@ -199,8 +204,9 @@ export async function tryCommitLoft(host: LoftHost): Promise<boolean> {
     return false;
   }
   const count = selectedIds.length;
+  const ids = [...selectedIds];
   resetState(host);
-  await host.commitLoft(mesh, count);
+  await host.commitLoft(mesh, count, ids);
   return true;
 }
 

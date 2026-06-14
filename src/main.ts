@@ -193,6 +193,12 @@ import {
   syncSceneFromProjectMeta,
 } from './project-io';
 import type { FeatureKind } from './feature-timeline';
+import {
+  type FeatureRecipe,
+  recipeIdForBody,
+  recipeForBody,
+  withRecipe,
+} from './feature-recipe';
 import { bindHistoryTimeline } from './history-timeline';
 import { UndoHistory, captureSnapshot } from './undo';
 import { bindSolidFeatureButtons } from './solid-features';
@@ -391,6 +397,8 @@ let sketchInteraction: SketchInteraction | null = null;
 let hoveredOriginPlane: PlaneAxis | null = null;
 let sketchDimensions: SketchDimension[] = [];
 let sketchConstraints: SketchConstraint[] = [];
+/** Parametric feature recipes (#30 Phase 2): re-executable solid-feature definitions. */
+let featureRecipes: FeatureRecipe[] = [];
 let sketchUnit: SketchUnit = 'mm';
 let sketchDimKind: SketchDimensionKind = 'linear';
 let sketchConstraintKind: SketchConstraintKind = 'coincident';
@@ -3453,6 +3461,8 @@ async function promoteMeshToNewBody(
     featureKind?: FeatureKind;
     afterTool?: Tool;
     keepSketch?: boolean;
+    /** #30 Phase 2: build a parametric recipe for the new body (bodyId known here). */
+    makeRecipe?: (bodyId: string) => FeatureRecipe | null;
   },
 ) {
   await initWasm();
@@ -3490,6 +3500,10 @@ async function promoteMeshToNewBody(
   applyScanTheme(bodyDisplayMode, bodyBrightness);
   refreshBrowserPanel();
   if (opts?.featureKind) recordSolidFeature(opts.featureKind, label, bodyId);
+  if (opts?.makeRecipe) {
+    const recipe = opts.makeRecipe(bodyId);
+    if (recipe) featureRecipes = withRecipe(featureRecipes, recipe);
+  }
   updateTransformGizmo();
   syncOrbitControls();
 }
@@ -3675,7 +3689,7 @@ const extrudeHost: ExtrudeHost = {
   },
   showExtrudeGizmo: (anchor, normal, distanceMm) => extrudeGizmo.show(anchor, normal, distanceMm),
   clearExtrudeGizmo: () => extrudeGizmo.clear(),
-  commitExtrude: async (mesh, distanceMm) => {
+  commitExtrude: async (mesh, distanceMm, sourceContourId) => {
     const sketchId = activeSketchId;
     formGroup.clear();
     extrudeGizmo.clear();
@@ -3687,6 +3701,15 @@ const extrudeHost: ExtrudeHost = {
       featureKind: 'extrude',
       afterTool: 'navigate',
       keepSketch: !!sketchId,
+      makeRecipe: sourceContourId
+        ? (bid) => ({
+            id: recipeIdForBody(bid),
+            bodyId: bid,
+            kind: 'extrude',
+            sourceContourIds: [sourceContourId],
+            distanceMm,
+          })
+        : undefined,
     });
     selectContour(null);
     rebuildContourLines();
@@ -3722,7 +3745,7 @@ const revolveHost: RevolveHost = {
     formGroup.clear();
     refreshBrowserPanel();
   },
-  commitRevolve: async (mesh, angleDeg) => {
+  commitRevolve: async (mesh, angleDeg, sourceContourId, axis) => {
     formGroup.clear();
     pushUndo(t('undo.revolve'));
     await promoteMeshToNewBody(mesh, t('solid.bodyRevolve'), {
@@ -3730,6 +3753,17 @@ const revolveHost: RevolveHost = {
       workspace: 'body',
       bodyKind: 'solid',
       featureKind: 'revolve',
+      makeRecipe: sourceContourId
+        ? (bid) => ({
+            id: recipeIdForBody(bid),
+            bodyId: bid,
+            kind: 'revolve',
+            sourceContourIds: [sourceContourId],
+            axis,
+            angleDeg,
+            segments: 48,
+          })
+        : undefined,
     });
     setStatus(t('status.revolveDone', { angle: angleDeg.toFixed(0) }));
   },
@@ -3761,7 +3795,7 @@ const loftHost: LoftHost = {
     formGroup.clear();
     refreshBrowserPanel();
   },
-  commitLoft: async (mesh, profileCount) => {
+  commitLoft: async (mesh, profileCount, sourceContourIds) => {
     formGroup.clear();
     if (loftCommitMode === 'negativform') {
       pushUndo('Negativform erstellen');
@@ -3779,6 +3813,16 @@ const loftHost: LoftHost = {
         workspace: 'body',
         bodyKind: 'loft',
         featureKind: 'loft',
+        makeRecipe:
+          sourceContourIds.length >= 2
+            ? (bid) => ({
+                id: recipeIdForBody(bid),
+                bodyId: bid,
+                kind: 'loft',
+                sourceContourIds: [...sourceContourIds],
+                closedEnds: true,
+              })
+            : undefined,
       });
       setStatus(t('status.loftDoneSolid', { count: profileCount }));
     }
@@ -6430,6 +6474,8 @@ async function boot() {
     solveActiveSketch: () => solveActiveSketchConstraints(),
     // ── #30 timeline rollback test bridge ──
     timelineFeatureCount: () => featureTimelineCount(),
+    featureRecipeCount: () => featureRecipes.length,
+    featureRecipeForBody: (bodyId: string) => recipeForBody(featureRecipes, bodyId) ?? null,
     timelineMarker: () => getTimelineMarker(),
     timelineActiveCount: () => timelineActiveCount(),
     setTimelineMarker: (n: number) => {

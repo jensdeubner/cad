@@ -27,13 +27,19 @@ export type ExtrudeHost = ProfilePickHost & {
   clearExtrudePreview: () => void;
   showExtrudeGizmo: (anchor: THREE.Vector3, normal: THREE.Vector3, distanceMm: number) => void;
   clearExtrudeGizmo: () => void;
-  commitExtrude: (mesh: ParsedLoftMesh, distanceMm: number) => Promise<void>;
+  commitExtrude: (
+    mesh: ParsedLoftMesh,
+    distanceMm: number,
+    sourceContourId: string | null,
+  ) => Promise<void>;
   highlightContour: (id: string | null) => void;
   syncOrbitControls: () => void;
 };
 
 let phase: ExtrudePhase = 'idle';
 let basePayload: LoftContourPayload | null = null;
+/** Source contour id of the active profile (for #30 parametric recipe capture). */
+let sourceContourId: string | null = null;
 const extrudeNormal = new THREE.Vector3();
 const anchorWorld = new THREE.Vector3();
 let dragging = false;
@@ -71,6 +77,7 @@ function resetState(
 ) {
   phase = 'idle';
   basePayload = null;
+  sourceContourId = null;
   dragging = false;
   dragDistanceMm = 0;
   dragStartClientY = 0;
@@ -143,6 +150,7 @@ function prepareProfile(contourId: string, host: ExtrudeHost): boolean {
   }
   const wm = host.getContourWorldMatrix(raw);
   basePayload = contourLoftPayload(raw, wm);
+  sourceContourId = contourId;
   const plane = contourPlaneInWorld(raw, wm);
   extrudeNormal.copy(plane.normal);
   anchorWorld.copy(profileCentroid(raw, wm));
@@ -186,8 +194,9 @@ async function commitIfValid(host: ExtrudeHost) {
     return;
   }
   const distance = dragDistanceMm;
+  const srcId = sourceContourId;
   resetState(host);
-  await host.commitExtrude(mesh, distance);
+  await host.commitExtrude(mesh, distance, srcId);
 }
 
 export function handleExtrudePointerDown(e: PointerEvent, host: ExtrudeHost): boolean {

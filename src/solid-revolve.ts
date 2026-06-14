@@ -15,7 +15,12 @@ export type RevolveHost = ProfilePickHost & {
   revolveProfile: (base: LoftContourPayload, axis: PlaneAxis, angleDeg: number) => ParsedLoftMesh | null;
   showRevolvePreview: (mesh: ParsedLoftMesh) => void;
   clearRevolvePreview: () => void;
-  commitRevolve: (mesh: ParsedLoftMesh, angleDeg: number) => Promise<void>;
+  commitRevolve: (
+    mesh: ParsedLoftMesh,
+    angleDeg: number,
+    sourceContourId: string | null,
+    axis: PlaneAxis,
+  ) => Promise<void>;
   highlightContour: (id: string | null) => void;
   syncOrbitControls: () => void;
 };
@@ -23,6 +28,8 @@ export type RevolveHost = ProfilePickHost & {
 let phase: RevolvePhase = 'idle';
 let basePayload: LoftContourPayload | null = null;
 let profileAxis: PlaneAxis = 'xy';
+/** Source contour id of the active profile (for #30 parametric recipe capture). */
+let sourceContourId: string | null = null;
 let dragging = false;
 let dragStartClientX = 0;
 let dragAngleDeg = 360;
@@ -43,6 +50,7 @@ export function isRevolveActive(): boolean {
 function resetState(host?: Pick<RevolveHost, 'clearRevolvePreview' | 'highlightContour' | 'syncOrbitControls'>) {
   phase = 'idle';
   basePayload = null;
+  sourceContourId = null;
   dragging = false;
   dragAngleDeg = 360;
   dragStartClientX = 0;
@@ -80,6 +88,7 @@ function prepareProfile(contourId: string, host: RevolveHost): boolean {
   const wm = host.getContourWorldMatrix(raw);
   basePayload = contourLoftPayload(raw, wm);
   profileAxis = raw.axis;
+  sourceContourId = contourId;
   phase = 'dragAngle';
   dragAngleDeg = 360;
   host.highlightContour(contourId);
@@ -119,8 +128,10 @@ async function commitIfValid(host: RevolveHost) {
     return;
   }
   const angle = dragAngleDeg;
+  const srcId = sourceContourId;
+  const axis = profileAxis;
   resetState(host);
-  await host.commitRevolve(mesh, angle);
+  await host.commitRevolve(mesh, angle, srcId, axis);
 }
 
 export function handleRevolvePointerDown(e: PointerEvent, host: RevolveHost): boolean {
