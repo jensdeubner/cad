@@ -874,6 +874,10 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/scale-to-size: Auf Größe skalieren ──
+  'solid.scaleToSize': 'Auf Größe skalieren',
+  'status.scaleToSizeDone': 'Auf Zielgröße skaliert (größte Kante 50 mm)',
+  'status.scaleToSizeNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── feat/bbox-body: Begrenzungsrahmen-Körper ──
   'solid.bboxBody': 'Begrenzungsrahmen',
   'status.bboxBodyDone': 'Begrenzungsrahmen-Körper erstellt',
