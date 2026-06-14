@@ -19,9 +19,15 @@ export function convexHullGeometry(points: THREE.Vector3[]): THREE.BufferGeometr
   if (!points || points.length < 4) {
     return new THREE.BufferGeometry();
   }
-  const geom = new ConvexGeometry(points);
-  geom.computeVertexNormals();
-  return geom;
+  // QuickHull throws on collinear / fully-degenerate input — degrade to an
+  // empty geometry instead of crashing the feature.
+  try {
+    const geom = new ConvexGeometry(points);
+    geom.computeVertexNormals();
+    return geom;
+  } catch {
+    return new THREE.BufferGeometry();
+  }
 }
 
 /**

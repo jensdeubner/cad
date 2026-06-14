@@ -37,7 +37,8 @@ export function scaleGeometry(
     out.boundingBox?.getCenter(pivot);
   }
 
-  const pos = out.getAttribute('position') as THREE.BufferAttribute;
+  const pos = out.getAttribute('position') as THREE.BufferAttribute | undefined;
+  if (!pos || pos.count === 0) return out; // nothing to scale (empty geometry)
   for (let i = 0; i < pos.count; i++) {
     const x = (pos.getX(i) - pivot.x) * factor + pivot.x;
     const y = (pos.getY(i) - pivot.y) * factor + pivot.y;
