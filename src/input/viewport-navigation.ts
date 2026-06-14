@@ -22,7 +22,7 @@ type OrbitControlsInternals = OrbitControls & {
 /** Resync OrbitControls after the camera was moved externally (ViewCube orbit/flight). */
 export function syncOrbitControlsFromCamera(
   controls: OrbitControls,
-  camera: THREE.PerspectiveCamera,
+  camera: THREE.Camera,
 ): void {
   const c = controls as OrbitControlsInternals;
   _offset.copy(camera.position).sub(controls.target);

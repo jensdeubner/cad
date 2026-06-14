@@ -893,6 +893,42 @@ export const de: Record<string, string> = {
   'cadscript.statusOk': 'CAD-Skript: {{n}} Körper erstellt.',
   'cadscript.noBodies': 'Keine Körper zum Rendern — zuerst ein Skript ausführen.',
   'cadscript.rendered': '{{n}} Ansichten gerendert.',
+  // ── #1 measure: 3D-Winkelmessung (3-Punkt) ──
+  'inspect.measureAngle': 'Winkel messen',
+  'status.measureAngleDone': 'Winkel: {{deg}}°',
+  'status.measureAngleNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── [#1 measure] Fläche messen (Gesamtoberfläche + koplanare Region) ──
+  'inspect.measureArea': 'Fläche messen',
+  'status.measureAreaDone': 'Gesamtoberfläche: {{area}} mm²',
+  'status.measureAreaFace': 'Flächenregion: {{area}} mm²',
+  'status.measureAreaNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/named-views: Eigene benannte Ansichten (mehrere Slots) ──
+  'view.namedSave': 'Ansicht merken',
+  'view.namedRestore': 'Letzte Ansicht',
+  'view.namedSlot': 'Ansicht {{n}}',
+  'view.namedDelete': 'Löschen',
+  'panel.namedViews.title': 'Eigene Ansichten',
+  'status.namedViewSaved': 'Ansicht „{{name}}“ gespeichert ({{count}} gesamt)',
+  'status.namedViewRestored': 'Ansicht „{{name}}“ geladen',
+  'status.namedViewNone': 'Keine gespeicherten Ansichten',
+  // ── feat/mesh-hole-fill (#21) ──
+  'mesh.holeFill': 'Löcher füllen',
+  'status.holeFillDone': '{{count}} Loch/Löcher gefüllt (+{{tris}} Dreiecke)',
+  'status.holeFillNone': 'Keine Löcher gefunden — Netz ist geschlossen',
+  'status.holeFillNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/separate: split disconnected shells into bodies ──
+  'mesh.separate': 'Körper trennen',
+  'status.separateDone': 'In {{count}} Körper getrennt',
+  'status.separateOne': 'Nur eine zusammenhängende Schale — nichts zu trennen',
+  'status.separateNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── #33: Remesh (refine to target edge length) ──
+  'mesh.remesh': 'Neu vernetzen',
+  'status.remeshDone': 'Neu vernetzt: {{before}} → {{after}} Dreiecke',
+  'status.remeshNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/view-projection: Perspektive/Ortho-Umschalter ──
+  'view.projection': 'Projektion',
+  'status.projectionOrtho': 'Orthografische Projektion',
+  'status.projectionPersp': 'Perspektivische Projektion',
   // ── #11: Sketch-Constraint-Solver (live) ──
   'ribbon.constraint': 'Zwang',
   'sketchConstraint.kind.coincident': 'Koinzident',

@@ -31,7 +31,16 @@ export interface FeatureHost {
 
   // ── three.js handles ────────────────────────────────────────────
   scene: THREE.Scene;
-  camera: THREE.PerspectiveCamera;
+  /**
+   * The active viewport camera — a PerspectiveCamera by default, an
+   * OrthographicCamera after a projection toggle. `Raycaster.setFromCamera`
+   * works for both, so picking stays correct in either projection.
+   */
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
+  /** Current camera projection mode. */
+  getCameraProjection(): 'perspective' | 'orthographic';
+  /** Switch the viewport camera between perspective and orthographic projection. */
+  setCameraProjection(mode: 'perspective' | 'orthographic'): void;
   renderer: THREE.WebGLRenderer;
   controls: OrbitControls;
   /** A dedicated group (added to the scene by PR0) for feature overlays. */

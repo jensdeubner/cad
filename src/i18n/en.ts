@@ -892,6 +892,42 @@ export const en: Record<string, string> = {
   'cadscript.statusOk': 'CAD script: {{n}} body/bodies created.',
   'cadscript.noBodies': 'No bodies to render — run a script first.',
   'cadscript.rendered': 'Rendered {{n}} views.',
+  // ── #1 measure: 3D angle measurement (3-point) ──
+  'inspect.measureAngle': 'Measure angle',
+  'status.measureAngleDone': 'Angle: {{deg}}°',
+  'status.measureAngleNoBody': 'No active body — load geometry or create a primitive first',
+  // ── [#1 measure] Measure area (total surface + coplanar region) ──
+  'inspect.measureArea': 'Measure area',
+  'status.measureAreaDone': 'Total surface area: {{area}} mm²',
+  'status.measureAreaFace': 'Face region: {{area}} mm²',
+  'status.measureAreaNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/named-views: multi-slot custom named views ──
+  'view.namedSave': 'Remember view',
+  'view.namedRestore': 'Last view',
+  'view.namedSlot': 'View {{n}}',
+  'view.namedDelete': 'Delete',
+  'panel.namedViews.title': 'Custom views',
+  'status.namedViewSaved': 'View "{{name}}" saved ({{count}} total)',
+  'status.namedViewRestored': 'View "{{name}}" restored',
+  'status.namedViewNone': 'No saved views',
+  // ── feat/mesh-hole-fill (#21) ──
+  'mesh.holeFill': 'Fill holes',
+  'status.holeFillDone': 'Filled {{count}} hole(s) (+{{tris}} triangles)',
+  'status.holeFillNone': 'No holes found — mesh is already closed',
+  'status.holeFillNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/separate: split disconnected shells into bodies ──
+  'mesh.separate': 'Separate bodies',
+  'status.separateDone': 'Separated into {{count}} bodies',
+  'status.separateOne': 'Only one connected shell — nothing to separate',
+  'status.separateNoBody': 'No active body — load geometry or create a primitive first',
+  // ── #33: Remesh (refine to target edge length) ──
+  'mesh.remesh': 'Remesh (refine)',
+  'status.remeshDone': 'Remeshed: {{before}} → {{after}} triangles',
+  'status.remeshNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/view-projection: perspective/ortho toggle ──
+  'view.projection': 'Projection',
+  'status.projectionOrtho': 'Orthographic projection',
+  'status.projectionPersp': 'Perspective projection',
   // ── #11: sketch constraint solver (live) ──
   'ribbon.constraint': 'Constraint',
   'sketchConstraint.kind.coincident': 'Coincident',

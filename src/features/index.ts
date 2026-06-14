@@ -41,6 +41,13 @@ import './solid-sphere-body';
 import './io-ply-export';
 import './construct-plane';
 import './cad-script';
+import './inspect-measure-angle';
+import './inspect-measure-area';
+import './nav-named-views';
+import './mesh-hole-fill';
+import './mesh-separate';
+import './mesh-remesh';
+import './view-projection';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
