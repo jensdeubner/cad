@@ -1026,4 +1026,8 @@ export const en: Record<string, string> = {
   'status.planeCutDone': 'Plane cut — lower half removed',
   'status.planeCutEmpty': 'Plane cut empty — plane lies above the body',
   'status.planeCutNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/ply-export ──
+  'io.plyExport': 'Export PLY',
+  'status.plyExportDone': 'PLY exported: {{faces}} faces',
+  'status.plyExportNoBody': 'No active body — load or create geometry first',
 };

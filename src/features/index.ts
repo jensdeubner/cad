@@ -38,6 +38,7 @@ import './solid-drop-floor';
 import './solid-scale-to-size';
 import './solid-plane-cut';
 import './solid-sphere-body';
+import './io-ply-export';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

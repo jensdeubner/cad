@@ -1027,4 +1027,8 @@ export const de: Record<string, string> = {
   'status.planeCutDone': 'Ebenenschnitt — untere Hälfte entfernt',
   'status.planeCutEmpty': 'Ebenenschnitt leer — Ebene liegt über dem Körper',
   'status.planeCutNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/ply-export ──
+  'io.plyExport': 'PLY exportieren',
+  'status.plyExportDone': 'PLY exportiert: {{faces}} Flächen',
+  'status.plyExportNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
 };
