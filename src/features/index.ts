@@ -31,6 +31,7 @@ import './solid-convex-hull';
 import './solid-scale-factor';
 import './io-obj-import';
 import './render-edge-display';
+import './solid-drop-floor';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

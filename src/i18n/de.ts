@@ -997,4 +997,8 @@ export const de: Record<string, string> = {
   'io.objImport': 'OBJ importieren',
   'status.objImportDone': 'OBJ importiert — {{tris}} Dreiecke',
   'status.objImportEmpty': 'OBJ leer oder ungültig — kein Körper erstellt',
+  // ── feat/drop-floor: Auf Boden setzen (Drop to floor) ──
+  'solid.dropFloor': 'Auf Boden setzen',
+  'status.dropFloorDone': 'Körper auf Boden gesetzt (min Z = 0)',
+  'status.dropFloorNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
 };
