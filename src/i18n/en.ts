@@ -881,4 +881,8 @@ export const en: Record<string, string> = {
   'solid.cylinder': 'Cylinder',
   'solid.sphere': 'Sphere',
   'status.primitiveCreated': '{{label}} created',
+  // ── feat/construct-axis: Construction geometry ──
+  'construct.geometry': 'Construction',
+  'construct.axisPoint': 'Axis + Point',
+  'status.constructDone': 'Construction axes and origin point created',
 };
