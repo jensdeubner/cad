@@ -996,4 +996,8 @@ export const en: Record<string, string> = {
   'io.objImport': 'Import OBJ',
   'status.objImportDone': 'OBJ imported — {{tris}} triangles',
   'status.objImportEmpty': 'OBJ empty or invalid — no body created',
+  // ── feat/ply-export ──
+  'io.plyExport': 'Export PLY',
+  'status.plyExportDone': 'PLY exported: {{faces}} faces',
+  'status.plyExportNoBody': 'No active body — load or create geometry first',
 };

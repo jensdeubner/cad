@@ -997,4 +997,8 @@ export const de: Record<string, string> = {
   'io.objImport': 'OBJ importieren',
   'status.objImportDone': 'OBJ importiert — {{tris}} Dreiecke',
   'status.objImportEmpty': 'OBJ leer oder ungültig — kein Körper erstellt',
+  // ── feat/ply-export ──
+  'io.plyExport': 'PLY exportieren',
+  'status.plyExportDone': 'PLY exportiert: {{faces}} Flächen',
+  'status.plyExportNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder erstellen',
 };
