@@ -874,6 +874,10 @@ export const de: Record<string, string> = {
   'status.dimUpdated': 'Bemaßung aktualisiert: {{value}}',
 
   // @i18n:append — feature agents insert exactly ONE block right below this line (append-only, never rewrite existing lines).
+  // ── feat/mesh-subdivide: Mesh unterteilen ──
+  'mesh.subdivide': 'Unterteilen',
+  'status.subdivideDone': 'Unterteilt: {{before}} → {{after}} Dreiecke',
+  'status.subdivideNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
   // ── feat/bbox-body: Begrenzungsrahmen-Körper ──
   'solid.bboxBody': 'Begrenzungsrahmen',
   'status.bboxBodyDone': 'Begrenzungsrahmen-Körper erstellt',
