@@ -962,4 +962,9 @@ export const de: Record<string, string> = {
   'inspect.com': 'Schwerpunkt',
   'status.comDone': 'Schwerpunkt: ({{x}}, {{y}}, {{z}})',
   'status.comNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
+  // ── feat/obj-import: OBJ-Import ──
+  'io.import': 'Import',
+  'io.objImport': 'OBJ importieren',
+  'status.objImportDone': 'OBJ importiert — {{tris}} Dreiecke',
+  'status.objImportEmpty': 'OBJ leer oder ungültig — kein Körper erstellt',
 };

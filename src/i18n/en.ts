@@ -961,4 +961,9 @@ export const en: Record<string, string> = {
   'inspect.com': 'Center of Mass',
   'status.comDone': 'Center of mass: ({{x}}, {{y}}, {{z}})',
   'status.comNoBody': 'No active body — load geometry or create a primitive first',
+  // ── feat/obj-import: OBJ import ──
+  'io.import': 'Import',
+  'io.objImport': 'Import OBJ',
+  'status.objImportDone': 'OBJ imported — {{tris}} triangles',
+  'status.objImportEmpty': 'OBJ empty or invalid — no body created',
 };
