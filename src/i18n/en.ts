@@ -966,4 +966,8 @@ export const en: Record<string, string> = {
   'view.toggleBodies': 'Toggle Bodies',
   'status.bodiesShown': 'All bodies shown',
   'status.bodiesHidden': 'All bodies hidden',
+  // ── feat/isolate: Isolate (show only the active body) ──
+  'view.isolate': 'Isolate',
+  'status.isolateOn': 'Isolated — only the active body is visible',
+  'status.isolateOff': 'Isolation cleared — all bodies visible',
 };

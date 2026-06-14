@@ -967,4 +967,8 @@ export const de: Record<string, string> = {
   'view.toggleBodies': 'Körper an/aus',
   'status.bodiesShown': 'Alle Körper eingeblendet',
   'status.bodiesHidden': 'Alle Körper ausgeblendet',
+  // ── feat/isolate: Isolieren (nur aktiven Körper zeigen) ──
+  'view.isolate': 'Isolieren',
+  'status.isolateOn': 'Isoliert — nur aktiver Körper sichtbar',
+  'status.isolateOff': 'Isolierung aufgehoben — alle Körper sichtbar',
 };

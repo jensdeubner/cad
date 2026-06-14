@@ -24,6 +24,7 @@ import './render-visual-style';
 import './solid-pattern-circular';
 import './solid-mirror-plane';
 import './view-visibility';
+import './view-isolate';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';
