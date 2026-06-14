@@ -19,6 +19,7 @@ import './inspect-measure';
 import './solid-intersect';
 import './solid-primitives-extra';
 import './mesh-weld';
+import './inspect-com';
 // @features:append
 
 export { getFeatures, registerFeature, getFeature } from './registry';

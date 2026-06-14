@@ -943,4 +943,8 @@ export const de: Record<string, string> = {
   'solid.torus': 'Torus',
   'solid.cone': 'Kegel',
   'solid.pyramid': 'Pyramide',
+  // ── feat/com-marker: Schwerpunkt + Bounding-Box ──
+  'inspect.com': 'Schwerpunkt',
+  'status.comDone': 'Schwerpunkt: ({{x}}, {{y}}, {{z}})',
+  'status.comNoBody': 'Kein aktiver Körper — zuerst Geometrie laden oder Grundkörper erstellen',
 };
