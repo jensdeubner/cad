@@ -6689,6 +6689,11 @@ async function boot() {
         y: (-v.y * 0.5 + 0.5) * rect.height + rect.top,
       };
     },
+    activeSketchId: () => activeSketchId,
+    finishActiveSketch: () => {
+      finishSketch();
+      return activeSketchId;
+    },
     beginSketchOnAxis: (axis: PlaneAxis) => {
       beginSketchOnPlane(axis, 0);
       return activeSketchId;

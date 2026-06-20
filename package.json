@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run build:wasm && vite build",
-    "build:wasm": "cd wasm-stl && wasm-pack build --target web --release",
+    "build:wasm": "PATH=\"${HOME}/.cargo/bin:${PATH}\" && cd wasm-stl && wasm-pack build --target web --release",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

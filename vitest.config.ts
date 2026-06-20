@@ -6,6 +6,7 @@ export default defineConfig({
     // pure math/three modules run fine here too. Heavy WebGL is never instantiated.
     environment: 'jsdom',
     globals: true,
+    setupFiles: ['test/setup.ts'],
     include: ['test/**/*.test.ts'],
     css: false,
     coverage: {

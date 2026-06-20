@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { de } from '../src/i18n/de';
 import { en } from '../src/i18n/en';
 import {
@@ -15,36 +15,6 @@ function placeholders(text: string): string[] {
   const tokens = text.match(/\{\{\w+\}\}/g) ?? [];
   return tokens.slice().sort();
 }
-
-// This Node-backed jsdom environment does NOT provide window.localStorage
-// (Node logs: "localStorage is not available because --localstorage-file was
-// not provided"). In a real browser localStorage exists, and setLocale() calls
-// localStorage.setItem(...). To exercise the real setLocale/t logic the way the
-// app runs in a browser, install a minimal in-memory localStorage polyfill on
-// the global. This only configures the test's own global; it does not touch
-// src, config, or other test files. Without it, setLocale() throws a TypeError
-// ("Cannot read properties of undefined (reading 'setItem')") on any real
-// locale switch — that is the actual behavior in this bare jsdom environment.
-beforeAll(() => {
-  if (typeof globalThis.localStorage === 'undefined') {
-    const store = new Map<string, string>();
-    const polyfill = {
-      getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
-      setItem: (k: string, v: string) => void store.set(k, String(v)),
-      removeItem: (k: string) => void store.delete(k),
-      clear: () => store.clear(),
-      key: (i: number) => [...store.keys()][i] ?? null,
-      get length() {
-        return store.size;
-      },
-    };
-    Object.defineProperty(globalThis, 'localStorage', {
-      value: polyfill,
-      configurable: true,
-      writable: true,
-    });
-  }
-});
 
 describe('i18n catalogs: de/en parity', () => {
   it('de and en expose the exact same set of keys', () => {
