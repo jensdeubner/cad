@@ -4,6 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CAD — Manuelle 3D Negativform</title>
+    <!-- Set theme before first paint to avoid a flash of the wrong colour scheme. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('cad-theme');
+          if (t !== 'light' && t !== 'dark') {
+            t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          document.documentElement.dataset.theme = t;
+        } catch (e) {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -33,6 +53,10 @@
             </select>
           </label>
           <div class="fusion-quick" data-i18n-attr="aria-label" data-i18n="quick.accessAria" aria-label="Schnellzugriff">
+            <button type="button" id="theme-toggle" class="quick-btn theme-toggle" title="Hell / Dunkel umschalten" aria-label="Theme umschalten">
+              <span class="theme-icon-sun" aria-hidden="true">☀</span>
+              <span class="theme-icon-moon" aria-hidden="true">☾</span>
+            </button>
             <button type="button" id="undo-point" class="quick-btn" title="Rückgängig (Strg+Z)">
               <span class="quick-btn-icon">↩</span>
             </button>
@@ -45,7 +69,11 @@
           </div>
         </div>
 
-        <div class="fusion-ribbon">
+        <div class="ribbon-deck" id="ribbon-deck">
+          <button type="button" class="ribbon-scroll ribbon-scroll-left" data-ribbon-scroll="-1" aria-label="Menü nach links scrollen" tabindex="-1">
+            <span aria-hidden="true">‹</span>
+          </button>
+          <div class="fusion-ribbon" id="fusion-ribbon">
           <div class="ribbon-workspace" data-ribbon="start">
             <div class="ribbon-group">
               <span class="ribbon-label" data-i18n-key="ribbon.geometry">Geometrie</span>
@@ -265,7 +293,7 @@
           </div>
 
           <div class="ribbon-workspace hidden" data-ribbon="solid">
-            <div class="ribbon-group">
+            <div class="ribbon-group" data-feature-group="solid.create">
               <span class="ribbon-label" data-i18n-key="solid.create">Erstellen</span>
               <button type="button" data-solid-feature="extrude" class="ribbon-btn ribbon-btn-stack ribbon-primary">
                 <span class="ribbon-btn-icon">⬆</span>
@@ -280,7 +308,7 @@
                 <span class="ribbon-btn-label" data-i18n-key="solid.loft">Loft</span>
               </button>
             </div>
-            <div class="ribbon-group">
+            <div class="ribbon-group" data-feature-group="solid.modify">
               <span class="ribbon-label" data-i18n-key="solid.modify">Ändern</span>
               <button type="button" data-solid-feature="press-pull" class="ribbon-btn ribbon-btn-stack">
                 <span class="ribbon-btn-icon">⇥</span>
@@ -291,7 +319,7 @@
                 <span class="ribbon-btn-label" data-i18n-key="solid.split-body">Körper teilen</span>
               </button>
             </div>
-            <div class="ribbon-group">
+            <div class="ribbon-group" data-feature-group="solid.pattern">
               <span class="ribbon-label" data-i18n-key="solid.pattern">Anordnung</span>
               <button type="button" data-solid-feature="rect-pattern" class="ribbon-btn ribbon-btn-stack">
                 <span class="ribbon-btn-icon">⊞</span>
@@ -306,7 +334,7 @@
                 <span class="ribbon-btn-label" data-i18n-key="solid.mirror">Spiegeln</span>
               </button>
             </div>
-            <div class="ribbon-group">
+            <div class="ribbon-group" data-feature-group="solid.combine">
               <span class="ribbon-label" data-i18n-key="solid.combine">Kombinieren</span>
               <button type="button" data-solid-feature="join" class="ribbon-btn ribbon-btn-stack">
                 <span class="ribbon-btn-icon">⊕</span>
@@ -373,7 +401,7 @@
           </div>
 
           <div class="ribbon-workspace hidden" data-ribbon="view">
-            <div class="ribbon-group">
+            <div class="ribbon-group" data-feature-group="view.camera">
               <span class="ribbon-label" data-i18n-key="ribbon.cameraGroup">Kamera</span>
               <button type="button" data-view="perspective" class="ribbon-btn ribbon-btn-stack">
                 <span class="ribbon-btn-icon">3D</span>
@@ -418,6 +446,10 @@
               </button>
             </div>
           </div>
+          </div>
+          <button type="button" class="ribbon-scroll ribbon-scroll-right" data-ribbon-scroll="1" aria-label="Menü nach rechts scrollen" tabindex="-1">
+            <span aria-hidden="true">›</span>
+          </button>
         </div>
       </header>
 

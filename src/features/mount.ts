@@ -15,8 +15,19 @@ function workspaceFor(tab: string): HTMLElement | null {
 
 /** Find or lazily create the ribbon-group container for a feature group. */
 function ensureGroup(ws: HTMLElement, groupKey: string): HTMLElement {
+  // Already created (or annotated in markup) for this group key.
   const existing = ws.querySelector<HTMLElement>(`[data-feature-group="${groupKey}"]`);
   if (existing) return existing;
+
+  // Merge into a hand-authored static group whose label shares this i18n key,
+  // so static + dynamic buttons sit in one group instead of duplicating it.
+  const staticLabel = ws.querySelector<HTMLElement>(
+    `:scope > .ribbon-group > .ribbon-label[data-i18n-key="${groupKey}"]`,
+  );
+  if (staticLabel?.parentElement) {
+    staticLabel.parentElement.setAttribute('data-feature-group', groupKey);
+    return staticLabel.parentElement;
+  }
 
   const group = document.createElement('div');
   group.className = 'ribbon-group';
@@ -58,6 +69,11 @@ function makeButton(def: FeatureDef, host: FeatureHost): HTMLButtonElement {
   label.className = 'ribbon-btn-label';
   label.setAttribute('data-i18n-key', def.labelKey);
   label.textContent = def.labelKey;
+
+  // Full name as tooltip so a clamped 2-line label is never ambiguous
+  // (e.g. "Bounding Box" vs "Bounding Box Body").
+  const fullLabel = host.t(def.labelKey);
+  if (fullLabel && fullLabel !== def.labelKey) btn.title = fullLabel;
 
   btn.appendChild(icon);
   btn.appendChild(label);

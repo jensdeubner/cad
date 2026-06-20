@@ -82,6 +82,7 @@ import {
   syncOrbitControlsFromCamera,
 } from './input/viewport-navigation';
 import { syncToolButtonHighlight, updateSketchRibbonState } from './sketch-mode/ribbon-state';
+import { initRibbonOverflow } from './input/ribbon-overflow';
 import { createSketchDimensionApi, type SketchDimensionApi } from './sketch-mode/dimensions';
 import {
   cloneSketchConstraint,
@@ -317,6 +318,16 @@ const appMenu = new AppMenu(
   },
   (tab) => handleTabWorkspaceSwitch?.(tab),
 );
+
+// Command-deck horizontal overflow: edge fades, chevrons, wheel→scroll.
+// A MutationObserver inside the controller re-measures on tab switches
+// (workspaces toggle `.hidden`), so no extra wiring into tab handling is needed.
+const ribbonDeckEl = document.getElementById('ribbon-deck');
+const ribbonScrollerEl = document.getElementById('fusion-ribbon');
+if (ribbonDeckEl && ribbonScrollerEl) {
+  initRibbonOverflow(ribbonDeckEl, ribbonScrollerEl);
+}
+
 const toolHint = dom.toolHint;
 const viewportMenu = dom.viewportMenu;
 const pointMenu = dom.pointMenu;
@@ -673,9 +684,50 @@ renderer.toneMappingExposure = SCAN_THEMES.cad.toneExposure;
 renderer.domElement.style.touchAction = 'none';
 viewport.appendChild(renderer.domElement);
 
+/* ───────────────────────────────────────────────────────────────
+   App theme (light / dark) — drives the CSS shell AND the 3D
+   environment (background gradient, floor grid, hemisphere tint).
+   Display modes (cad / kontrast / …) keep controlling the *model*
+   surface; the room around it follows the app theme so light/dark
+   stay perfectly coherent.
+   ─────────────────────────────────────────────────────────────── */
+type AppTheme = 'light' | 'dark';
+interface ShellScene {
+  background: number;
+  grid: [number, number]; // [section, cell]
+  axisX: number;
+  axisZ: number;
+  hemiSky: number;
+  hemiGround: number;
+}
+const SHELL_SCENES: Record<AppTheme, ShellScene> = {
+  dark: {
+    background: 0x141925,
+    grid: [0x47546d, 0x2a3140],
+    axisX: 0xff6b6b,
+    axisZ: 0x5a9bff,
+    hemiSky: 0xb8c6e0,
+    hemiGround: 0x202632,
+  },
+  light: {
+    background: 0xe3e9f2,
+    grid: [0x97a4bc, 0xc4cedd],
+    axisX: 0xe2556b,
+    axisZ: 0x2f7fe0,
+    hemiSky: 0xffffff,
+    hemiGround: 0xc4ccda,
+  },
+};
+let appTheme: AppTheme =
+  document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+function shellScene(): ShellScene {
+  return SHELL_SCENES[appTheme];
+}
+
 // Tone-mapped studio gradient background + image-based lighting (PMREM).
-function applySceneBackground(theme = SCAN_THEMES[bodyDisplayMode]) {
-  const tex = makeGradientTexture(gradientStops(theme.background));
+// The background follows the app theme (the room), not the display mode.
+function applySceneBackground(_theme = SCAN_THEMES[bodyDisplayMode]) {
+  const tex = makeGradientTexture(gradientStops(shellScene().background));
   const prev = scene.background;
   scene.background = tex;
   if (prev && (prev as THREE.Texture).isTexture) (prev as THREE.Texture).dispose();
@@ -742,15 +794,46 @@ function configureFloorGrid(
   size = cadScene.size > 1 ? cadScene.size : EMPTY_PROJECT_VIEW_SIZE,
 ) {
   const cell = niceGridStep(size);
+  const s = shellScene();
   infiniteGrid.configure({
     cellSize: cell,
     sectionSize: cell * 10,
     fadeNear: size * 1.3,
     fadeFar: size * 5,
-    colors: studioGridColors(theme),
+    // Floor grid is part of the room → follow the app theme, not display mode.
+    colors: { cell: s.grid[1], section: s.grid[0], axisX: s.axisX, axisZ: s.axisZ },
   });
   const c = cadScene.bounds.getCenter(new THREE.Vector3());
   infiniteGrid.setCenter(c.x, c.z);
+}
+
+/**
+ * Switch the whole app between light and dark. Updates the CSS shell
+ * (`<html data-theme>`), persists the choice, and recolours the 3D room
+ * (background gradient, floor grid, hemisphere tint). Display-mode model
+ * rendering is untouched. The render loop repaints automatically.
+ */
+function applyAppTheme(theme: AppTheme, persist = true): void {
+  appTheme = theme;
+  document.documentElement.dataset.theme = theme;
+  if (persist) {
+    try {
+      localStorage.setItem('cad-theme', theme);
+    } catch {
+      /* storage unavailable — ignore */
+    }
+  }
+  const s = SHELL_SCENES[theme];
+  applySceneBackground();
+  hemi.color.setHex(s.hemiSky);
+  hemi.groundColor.setHex(s.hemiGround);
+  configureFloorGrid();
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.setAttribute('aria-pressed', theme === 'light' ? 'true' : 'false');
+}
+
+function toggleAppTheme(): void {
+  applyAppTheme(appTheme === 'light' ? 'dark' : 'light');
 }
 
 const axes = new THREE.AxesHelper(30);
@@ -3497,8 +3580,9 @@ function applyScanTheme(mode: ScanDisplayMode, brightness = bodyBrightness) {
 
   applySceneBackground(theme);
   ambient.intensity = theme.ambient * brightness;
-  hemi.color.setHex(theme.hemiSky);
-  hemi.groundColor.setHex(theme.hemiGround);
+  // Hemisphere tint belongs to the room → keep it on the app theme.
+  hemi.color.setHex(shellScene().hemiSky);
+  hemi.groundColor.setHex(shellScene().hemiGround);
   hemi.intensity = theme.hemiIntensity * brightness;
   dir.intensity = theme.dirIntensity * brightness;
   fill.intensity = theme.fillIntensity * brightness;
@@ -5917,6 +6001,7 @@ document.getElementById('discard-draft')!.addEventListener('click', () => {
     statusWhenNoOpenDraft();
   }
 });
+document.getElementById('theme-toggle')?.addEventListener('click', () => toggleAppTheme());
 document.getElementById('undo-point')!.addEventListener('click', () => performUndo());
 document.getElementById('redo-point')!.addEventListener('click', () => performRedo());
 
@@ -6470,6 +6555,7 @@ async function boot() {
   refreshSketchGridUi();
   setupEmptyProjectView();
   applyScanTheme(bodyDisplayMode, bodyBrightness);
+  applyAppTheme(appTheme, false); // sync 3D room to the theme already on <html>
   refreshBrowserPanel();
   updateSketchRibbonState(null, 'sketch-pick');
   refreshHistoryTimeline();

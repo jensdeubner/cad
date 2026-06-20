@@ -172,6 +172,13 @@ function setLabelPrefix(label: Element, key: string) {
     span.setAttribute('data-i18n-label', key);
   }
   span.textContent = t(key);
+  // Drop the original hard-coded label text left in the markup — otherwise the
+  // source-language text and the injected translation render stacked together.
+  for (const node of [...label.childNodes]) {
+    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+      label.removeChild(node);
+    }
+  }
 }
 
 function setCheckLabel(label: Element, key: string) {

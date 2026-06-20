@@ -80,23 +80,24 @@ function ensureStyles(): void {
   style.id = 'cad-script-style';
   style.textContent = `
   .cadscript-panel{position:fixed;right:18px;top:96px;width:440px;max-width:46vw;z-index:60;
-    background:#1f2329;color:#e8eaed;border:1px solid #3a4049;border-radius:10px;
-    box-shadow:0 12px 40px rgba(0,0,0,.45);font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;display:flex;flex-direction:column;overflow:hidden}
-  .cadscript-head{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#272c33;border-bottom:1px solid #3a4049;cursor:move}
-  .cadscript-head b{font:600 13px system-ui;flex:1}
-  .cadscript-x{cursor:pointer;border:0;background:transparent;color:#9aa3ad;font-size:16px;line-height:1;padding:2px 6px;border-radius:6px}
-  .cadscript-x:hover{background:#3a4049;color:#fff}
+    background:var(--glass-strong);backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);
+    color:var(--text);border:1px solid var(--border-soft);border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-3);font:13px/1.45 var(--font-mono);display:flex;flex-direction:column;overflow:hidden}
+  .cadscript-head{display:flex;align-items:center;gap:8px;padding:9px 11px;background:color-mix(in srgb, var(--surface-2) 60%, transparent);border-bottom:1px solid var(--border);cursor:move}
+  .cadscript-head b{font:600 13px var(--font-display);letter-spacing:.02em;flex:1}
+  .cadscript-x{cursor:pointer;border:0;background:transparent;color:var(--text-muted);font-size:16px;line-height:1;padding:2px 6px;border-radius:6px}
+  .cadscript-x:hover{background:var(--danger-soft);color:var(--danger)}
   .cadscript-body{padding:10px;display:flex;flex-direction:column;gap:8px}
   .cadscript-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .cadscript-panel textarea{width:100%;min-height:150px;resize:vertical;background:#15181d;color:#e8eaed;
-    border:1px solid #3a4049;border-radius:8px;padding:8px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;tab-size:2}
-  .cadscript-panel select,.cadscript-panel button{font:12px system-ui;border-radius:7px;border:1px solid #3a4049;
-    background:#2b313a;color:#e8eaed;padding:6px 10px;cursor:pointer}
-  .cadscript-panel button.primary{background:#2f6df6;border-color:#2f6df6;color:#fff;font-weight:600}
+  .cadscript-panel textarea{width:100%;min-height:150px;resize:vertical;background:var(--surface-2);color:var(--text);
+    border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;font:12px/1.5 var(--font-mono);tab-size:2}
+  .cadscript-panel select,.cadscript-panel button{font:12px var(--font-ui);border-radius:7px;border:1px solid var(--border);
+    background:var(--surface-2);color:var(--text);padding:6px 10px;cursor:pointer}
+  .cadscript-panel button.primary{background:var(--plasma);border-color:transparent;color:var(--text-on-accent);font-weight:600}
   .cadscript-panel button:hover{filter:brightness(1.12)}
-  .cadscript-out{white-space:pre-wrap;background:#15181d;border:1px solid #3a4049;border-radius:8px;
+  .cadscript-out{white-space:pre-wrap;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-sm);
     padding:8px;min-height:54px;max-height:230px;overflow:auto;font-size:12px}
-  .cadscript-ok{color:#86efac}.cadscript-err{color:#fca5a5}.cadscript-dim{color:#9aa3ad}
+  .cadscript-ok{color:var(--success)}.cadscript-err{color:var(--danger-strong)}.cadscript-dim{color:var(--text-muted)}
   `;
   document.head.appendChild(style);
 }

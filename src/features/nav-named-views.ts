@@ -69,29 +69,31 @@ function ensureStyle(): void {
   position: fixed; right: 12px; bottom: 96px; z-index: 40;
   display: flex; flex-direction: column; gap: 6px;
   max-width: 220px; padding: 8px 10px;
-  font: 12px/1.4 system-ui, sans-serif; color: #e8e8ec;
-  background: rgba(28,30,36,0.92); border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  font: 12px/1.4 var(--font-ui); color: var(--text);
+  background: var(--glass); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius); box-shadow: var(--shadow-2);
 }
 #${PANEL_ID} .nv-title {
-  font-weight: 600; opacity: 0.8; letter-spacing: 0.02em; margin-bottom: 2px;
+  font-family: var(--font-display); font-weight: 600; text-transform: uppercase;
+  font-size: 10px; opacity: 0.8; letter-spacing: 0.08em; margin-bottom: 2px; color: var(--text-muted);
 }
 #${PANEL_ID} .nv-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 #${PANEL_ID} .nv-chip {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 6px 3px 9px; border-radius: 14px;
-  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
+  padding: 3px 6px 3px 9px; border-radius: var(--radius-pill);
+  background: var(--surface-2); border: 1px solid var(--border);
 }
 #${PANEL_ID} .nv-chip .nv-name {
   cursor: pointer; user-select: none; max-width: 120px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-#${PANEL_ID} .nv-chip .nv-name:hover { color: #fff; }
+#${PANEL_ID} .nv-chip .nv-name:hover { color: var(--accent); }
 #${PANEL_ID} .nv-del {
-  cursor: pointer; border: none; background: transparent; color: #ffb4b4;
+  cursor: pointer; border: none; background: transparent; color: var(--danger-strong);
   font-size: 13px; line-height: 1; padding: 0 2px; border-radius: 8px;
 }
-#${PANEL_ID} .nv-del:hover { color: #ff6b6b; background: rgba(255,107,107,0.15); }
+#${PANEL_ID} .nv-del:hover { color: var(--danger); background: var(--danger-soft); }
 `;
   document.head.appendChild(style);
 }
