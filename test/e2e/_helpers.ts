@@ -81,3 +81,23 @@ export async function waitForBodyCountAbove(page: Page, baseline: number, timeou
     { timeout },
   );
 }
+
+/** Click a ribbon tool button (`data-tool`) on the tab's ribbon strip. */
+export async function clickRibbonTool(page: Page, tool: string, tab?: string): Promise<void> {
+  if (tab) await selectTab(page, tab);
+  const scope = tab ? `[data-ribbon="${tab}"]` : '[data-ribbon]:not(.hidden)';
+  await page.locator(`${scope} [data-tool="${tool}"]`).first().click();
+}
+
+/** Open a floating side panel by its `data-open-panel` id. */
+export async function openPanel(page: Page, panelId: string): Promise<void> {
+  await page.locator(`[data-open-panel="${panelId}"]`).first().click();
+}
+
+/** Dispatch a Fusion shortcut via the debug bridge (no real key events). */
+export async function fusionShortcut(
+  page: Page,
+  init: { key: string; ctrl?: boolean; shift?: boolean },
+): Promise<unknown> {
+  return cadDebug(page, 'dispatchFusionShortcut', init);
+}

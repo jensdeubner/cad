@@ -46,7 +46,7 @@ import {
   refineAlignmentPosition,
 } from './scan-plane-align';
 import { AppMenu, type FusionTab } from './app-menu';
-import type { FusionShortcutAction } from './fusion-shortcuts';
+import { resolveFusionShortcut, type FusionShortcutAction } from './fusion-shortcuts';
 import {
   ALIGN_POS_STEP,
   ALIGN_ROT_STEP,
@@ -243,6 +243,7 @@ import {
   parsePromptFloat,
   parsePromptInt,
 } from './solid-ops';
+import { makePrimitiveGeometry } from './solid/primitives';
 import {
   toolAllowedInWorkspace,
   workspaceForTab,
@@ -6778,6 +6779,198 @@ async function boot() {
     recordFeatureTest: (kind: FeatureKind, label: string, bodyId: string) => {
       recordSolidFeature(kind, label, bodyId);
       return featureTimelineCount();
+    },
+    // ── E2E wave A–D: core workflows, tools, shortcuts, UI chrome ──
+    isEmptyProject: () => isEmptyProject(),
+    closedContourCount: () => closedContourCount(),
+    dimensionCount: () => sketchDimensions.length,
+    browserState: () => ({ ...browserState }),
+    browserTreeRowCount: () => document.querySelectorAll('#browser-tree .browser-item').length,
+    viewCubeMounted: () => (document.getElementById('view-cube-host')?.childElementCount ?? 0) > 0,
+    toggleBrowserSceneItem: (id: string) => toggleBrowserItem(id as BrowserItemId),
+    setActiveTool: (next: Tool) => {
+      if (tool !== next) setTool(next);
+      return tool;
+    },
+    addContourUV: (
+      uv: [number, number][],
+      closed: boolean,
+      axis?: PlaneAxis,
+      position?: number,
+    ) => {
+      if (axis) {
+        planeAxis = axis;
+        planeAxisSel.value = axis;
+      }
+      if (position !== undefined) {
+        planePosition = position;
+        planePos.value = String(position);
+        planePosVal.textContent = planePosition.toFixed(1);
+      }
+      const pts = contourPointsFromUV(uv, planeAxis, planePosition);
+      if (pts.length < 2) return null;
+      pushUndo('Kontur');
+      const contour: Contour = {
+        id: uid(),
+        componentId: ac().id,
+        sketchId: activeSketchId,
+        axis: planeAxis,
+        position: planePosition,
+        points: pts.map((p) => p.clone()),
+        closed,
+        color: CONTOUR_COLORS[contours.length % CONTOUR_COLORS.length],
+        visible: true,
+      };
+      contours.push(contour);
+      const line = makeContourLine(
+        contour.points,
+        contour.closed,
+        contourLineColor(contour),
+        lineResolution,
+        contour.closed ? 6 : 5,
+      );
+      line.name = contour.id;
+      line.visible = true;
+      drawGroup.add(line);
+      refreshContourList();
+      refreshBrowserPanel();
+      return contour.id;
+    },
+    sketchDragPrimitive: (
+      primTool: 'sketch-line' | 'sketch-circle' | 'sketch-rect',
+      uv0: [number, number],
+      uv1: [number, number],
+    ) => {
+      if (!activeSketchId) return null;
+      const a = contourPointsFromUV([uv0], planeAxis, planePosition);
+      const b = contourPointsFromUV([uv1], planeAxis, planePosition);
+      if (!a.length || !b.length) return null;
+      const before = contours.length;
+      finishSketchDrag(primTool, a[0], b[0]);
+      return contours.length > before ? contours[contours.length - 1].id : null;
+    },
+    loadTestBoxStl: async () => {
+      const geom = makePrimitiveGeometry('box', { size: 10 });
+      const posAttr = geom.getAttribute('position') as THREE.BufferAttribute;
+      const positions =
+        posAttr.array instanceof Float32Array
+          ? posAttr.array
+          : new Float32Array(posAttr.array as ArrayLike<number>);
+      const idx = geom.getIndex()!;
+      const indices =
+        idx.array instanceof Uint32Array
+          ? idx.array
+          : new Uint32Array(idx.array as ArrayLike<number>);
+      await initWasm();
+      const stlBuf = export_binary_stl(positions, indices);
+      geom.dispose();
+      await loadStlBuffer(stlBuf.buffer.slice(0) as ArrayBuffer, 'E2E-Box.stl', 1, 'scan');
+      return { triangles: dbgTriCount(ab()) };
+    },
+    commitLoftNegativformTest: async () => {
+      await initWasm();
+      cadScene.updateWorldMatrix();
+      const closed = contours.filter((c) => c.closed && c.points.length >= 3);
+      if (closed.length < 2) return { ok: false as const, reason: 'need-2-contours' };
+      const payloads = closed.map((c) => contourLoftPayload(c, contourWorldMatrix(c)));
+      const axis0 = payloads[0].axis;
+      if (!payloads.every((p) => p.axis === axis0)) {
+        return { ok: false as const, reason: 'axis-mismatch' };
+      }
+      let mesh: ReturnType<typeof loft_contours_json> | null = null;
+      try {
+        mesh = loft_contours_json(buildLoftContoursPayload(payloads));
+      } catch {
+        mesh = null;
+      }
+      if (!mesh || mesh.triangle_count < 1) return { ok: false as const, reason: 'loft-failed' };
+      const before = cadScene.listBodies().length;
+      await promoteLoftToNewBody(mesh);
+      return {
+        ok: true as const,
+        bodyCount: cadScene.listBodies().length,
+        added: cadScene.listBodies().length > before,
+        triangles: mesh.triangle_count,
+      };
+    },
+    projectRoundtrip: async () => {
+      await initWasm();
+      const snap = () => ({
+        sketchCount: sketches.length,
+        contourCount: contours.length,
+        dimensionCount: sketchDimensions.length,
+        bodyCount: cadScene.listBodies().length,
+      });
+      const before = snap();
+      const meta = buildProjectMeta({
+        activeComponentId: ac().id,
+        activeBodyId: ab().id,
+        components: cadScene.listComponents().map((comp) => ({
+          id: comp.id,
+          label: comp.label,
+          alignment: comp.alignment,
+          bodies: cadScene.listBodies(comp.id).map((b) => {
+            const solidColor = getBodySolidColor(b.id);
+            const sceneBody = cadScene.getBody(b.id);
+            const transform =
+              sceneBody && !isDefaultTransform(sceneBody.transform)
+                ? { ...sceneBody.transform }
+                : undefined;
+            return {
+              id: b.id,
+              label: b.label,
+              displayStride: b.displayStride,
+              bodyKind: sceneBody?.bodyKind,
+              transform,
+              solidColor:
+                solidColor !== SOLID_BODY_COLOR ? numberToHexColor(solidColor) : undefined,
+              traceAssist: isTraceAssistOn(b.id) ? true : undefined,
+            };
+          }),
+        })),
+        planeAxis,
+        planePosition,
+        hitTolerance: getHitTolerance(),
+        contours: contoursToProject(),
+        sketches: sketches.map((s) => ({ ...s })),
+        sketchDimensions: sketchDims.dimensionsToProject(),
+        sketchConstraints: sketchConstraints.map(cloneSketchConstraint),
+        featureRecipes: featureRecipes.map(cloneFeatureRecipe),
+        sketchUnit,
+        activeSketchId: activeSketchId ?? undefined,
+      });
+      const meshEntries = cadScene
+        .listBodies()
+        .filter((b) => b.meshBuffer && stlHasTriangles(b.meshBuffer))
+        .map((b) => ({ id: b.id, stl: new Uint8Array(b.meshBuffer!) }));
+      const packed = pack_project_multi(
+        JSON.stringify(meta),
+        meshEntries.length > 0 ? buildMeshArchive(meshEntries) : buildMeshArchive([]),
+      );
+      await loadProjectBuffer(packed.buffer.slice(0) as ArrayBuffer, 'e2e-roundtrip.stpr');
+      return { before, after: snap() };
+    },
+    undoTimeline: () => undoHistory.getTimeline(),
+    testUndo: () => {
+      performUndo();
+      return undoHistory.getTimeline();
+    },
+    testRedo: () => {
+      performRedo();
+      return undoHistory.getTimeline();
+    },
+    dispatchFusionShortcut: (init: { key: string; ctrl?: boolean; shift?: boolean }) => {
+      const faux = {
+        key: init.key,
+        ctrlKey: !!init.ctrl,
+        metaKey: !!init.ctrl,
+        shiftKey: !!init.shift,
+        altKey: false,
+      } as KeyboardEvent;
+      const action = resolveFusionShortcut(faux, { tool, activeSketchId });
+      if (!action || action.type === 'cancel') return null;
+      applyFusionShortcutAction(action);
+      return action;
     },
   };
 }
